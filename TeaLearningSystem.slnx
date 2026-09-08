@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="TeaLearning.Api/TeaLearning.Api.csproj" />
+  <Project Path="TeaLearning.Core/TeaLearning.Core.csproj" />
+  <Project Path="TeaLearning.Data/TeaLearning.Data.csproj" />
+  <Project Path="TeaLearning.Services/TeaLearning.Services.csproj" />
+</Solution>

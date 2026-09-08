@@ -1,0 +1,6 @@
+@TeaLearning.Api_HostAddress = http://localhost:5264
+
+GET {{TeaLearning.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
