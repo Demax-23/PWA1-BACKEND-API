@@ -6,7 +6,7 @@ using TeaLearning.Services.Interfaces;
 
 namespace TeaLearning.Api.Controllers;
 
-[Authorize(Roles = "Acudiente,Administrador")]
+[Authorize(Roles = "Acudiente,Administrador,Estudiante")]
 [Route("api/students/{id:guid}/sensory-preferences")]
 public class SensoryPreferencesController : BaseApiController
 {
@@ -18,7 +18,7 @@ public class SensoryPreferencesController : BaseApiController
     }
 
     /// <summary>
-    /// Consulta las preferencias sensoriales adaptativas de un estudiante (Restringido a Acudiente o Administrador - HU-003).
+    /// Consulta las preferencias sensoriales adaptativas de un estudiante (HU-003).
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status200OK)]
@@ -35,9 +35,10 @@ public class SensoryPreferencesController : BaseApiController
     }
 
     /// <summary>
-    /// Actualiza la configuración sensorial adaptativa (paleta, tipografía, audio, animaciones, contraste, etc.) (HU-003).
+    /// Actualiza la configuración sensorial adaptativa (paleta, tipografía, audio, animaciones, contraste, etc.) (Restringido a Acudiente o Administrador - HU-003).
     /// </summary>
     [HttpPut]
+    [Authorize(Roles = "Acudiente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status404NotFound)]

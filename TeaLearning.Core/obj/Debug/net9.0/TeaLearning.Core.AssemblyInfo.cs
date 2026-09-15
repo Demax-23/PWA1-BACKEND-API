@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TeaLearning.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b2bdebc964e2686e48a05de074c349de7c5c3c1b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7af53125d9b2905fe5b48bfa0d22745abc5c0d3a")]
 [assembly: System.Reflection.AssemblyProductAttribute("TeaLearning.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TeaLearning.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
