@@ -164,6 +164,7 @@ public class AuthService : IAuthService
                 Roles = roles,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
+                UltimaActividadAt = user.UltimaActividadAt,
                 EstudianteId = studentId,
                 DocenteId = teacherId,
                 AcudienteId = guardianId
@@ -211,6 +212,7 @@ public class AuthService : IAuthService
 
         user.RefreshToken = refreshToken;
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(refreshDurationDays);
+        user.UltimaActividadAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
         var authResponse = new AuthResponseDto
@@ -228,6 +230,7 @@ public class AuthService : IAuthService
                 Roles = roles.ToList(),
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
+                UltimaActividadAt = user.UltimaActividadAt,
                 EstudianteId = studentProfile?.Id,
                 DocenteId = teacherProfile?.Id,
                 AcudienteId = guardianProfile?.Id

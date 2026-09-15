@@ -37,7 +37,8 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             {
                 StudentProfileId = studentId,
                 PaletaColor = "PastelSuave",
-                Tipografia = "OpenDyslexic",
+                Tipografia = "Atkinson Hyperlegible",
+                MayorEspacioEntreLetras = false,
                 AudioActivo = true,
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
@@ -53,6 +54,7 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             StudentProfileId = pref.StudentProfileId,
             PaletaColor = pref.PaletaColor,
             Tipografia = pref.Tipografia,
+            MayorEspacioEntreLetras = pref.MayorEspacioEntreLetras,
             AudioActivo = pref.AudioActivo,
             AnimacionesReducidas = pref.AnimacionesReducidas,
             NivelEscalaFuente = pref.NivelEscalaFuente,
@@ -96,6 +98,7 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             StudentProfileId = pref.StudentProfileId,
             PaletaColor = pref.PaletaColor,
             Tipografia = pref.Tipografia,
+            MayorEspacioEntreLetras = pref.MayorEspacioEntreLetras,
             AudioActivo = pref.AudioActivo,
             AnimacionesReducidas = pref.AnimacionesReducidas,
             NivelEscalaFuente = pref.NivelEscalaFuente,
@@ -110,6 +113,7 @@ public class SensoryPreferenceService : ISensoryPreferenceService
     {
         entity.PaletaColor = dto.PaletaColor;
         entity.Tipografia = dto.Tipografia;
+        entity.MayorEspacioEntreLetras = dto.MayorEspacioEntreLetras;
         entity.AudioActivo = dto.AudioActivo;
         entity.AnimacionesReducidas = dto.AnimacionesReducidas;
         entity.NivelEscalaFuente = dto.NivelEscalaFuente;

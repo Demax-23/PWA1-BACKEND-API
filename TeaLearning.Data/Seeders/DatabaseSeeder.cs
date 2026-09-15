@@ -184,7 +184,8 @@ public static class DatabaseSeeder
                 {
                     StudentProfileId = studentProfile.Id,
                     PaletaColor = "PastelSuave",
-                    Tipografia = "OpenDyslexic",
+                    Tipografia = "Atkinson Hyperlegible",
+                    MayorEspacioEntreLetras = false,
                     AudioActivo = true,
                     AnimacionesReducidas = true,
                     NivelEscalaFuente = 2,

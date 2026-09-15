@@ -10,6 +10,7 @@ public class UserDto
     public List<string> Roles { get; set; } = new List<string>();
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? UltimaActividadAt { get; set; }
 
     // Identificadores de perfiles asociados si aplican
     public Guid? EstudianteId { get; set; }

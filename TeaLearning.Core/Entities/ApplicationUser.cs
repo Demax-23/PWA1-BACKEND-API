@@ -11,6 +11,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public DateTime? RefreshTokenExpiryTime { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UltimaActividadAt { get; set; }
 
     // Relaciones 1:1 opcionales con perfiles de rol
     public virtual StudentProfile? StudentProfile { get; set; }

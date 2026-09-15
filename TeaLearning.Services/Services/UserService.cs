@@ -48,6 +48,7 @@ public class UserService : IUserService
                 Roles = roles.ToList(),
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
+                UltimaActividadAt = user.UltimaActividadAt,
                 EstudianteId = user.StudentProfile?.Id,
                 DocenteId = user.TeacherProfile?.Id,
                 AcudienteId = user.GuardianProfile?.Id
@@ -82,6 +83,7 @@ public class UserService : IUserService
             Roles = roles.ToList(),
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
+            UltimaActividadAt = user.UltimaActividadAt,
             EstudianteId = user.StudentProfile?.Id,
             DocenteId = user.TeacherProfile?.Id,
             AcudienteId = user.GuardianProfile?.Id
@@ -139,6 +141,7 @@ public class UserService : IUserService
             Roles = dto.Roles,
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
+            UltimaActividadAt = user.UltimaActividadAt,
             EstudianteId = studentProfile?.Id,
             DocenteId = teacherProfile?.Id,
             AcudienteId = guardianProfile?.Id

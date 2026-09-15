@@ -373,6 +373,9 @@ namespace TeaLearning.Data.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime?>("UltimaActividadAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -559,6 +562,9 @@ namespace TeaLearning.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("MayorEspacioEntreLetras")
                         .HasColumnType("bit");
 
                     b.Property<string>("ModoContraste")

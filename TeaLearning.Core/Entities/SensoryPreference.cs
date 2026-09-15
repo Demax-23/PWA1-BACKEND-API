@@ -11,8 +11,11 @@ public class SensoryPreference : BaseEntity
     // Paleta de colores adaptativa (ej. "PastelSuave", "Neutro", "EscalaGrises")
     public string PaletaColor { get; set; } = "PastelSuave";
 
-    // Tipografía adaptada para lectura amigable (ej. "OpenDyslexic", "Arial", "Verdana")
-    public string Tipografia { get; set; } = "OpenDyslexic";
+    // Tipografía adaptada para lectura amigable (ej. "Atkinson Hyperlegible", "OpenDyslexic", "Arial", "Verdana")
+    public string Tipografia { get; set; } = "Atkinson Hyperlegible";
+
+    // Mayor espacio entre letras para legibilidad adaptativa
+    public bool MayorEspacioEntreLetras { get; set; } = false;
 
     // Retroalimentación sonora en interacciones
     public bool AudioActivo { get; set; } = true;

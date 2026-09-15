@@ -11,7 +11,7 @@ public class UpdateSensoryPreferenceDto
 
     [Required(ErrorMessage = "La tipografía es obligatoria")]
     [MaxLength(50)]
-    public string Tipografia { get; set; } = "OpenDyslexic";
+    public string Tipografia { get; set; } = "Atkinson Hyperlegible";
 
     public bool AudioActivo { get; set; }
 
@@ -23,4 +23,6 @@ public class UpdateSensoryPreferenceDto
     public ModoContraste ModoContraste { get; set; } = ModoContraste.Estandar;
 
     public bool OcultarTemporizadores { get; set; }
+
+    public bool MayorEspacioEntreLetras { get; set; }
 }
