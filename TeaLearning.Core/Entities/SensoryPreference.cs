@@ -20,6 +20,12 @@ public class SensoryPreference : BaseEntity
     // Retroalimentación sonora en interacciones
     public bool AudioActivo { get; set; } = true;
 
+    // Volumen de audio preferido (0 a 100)
+    public int VolumenAudio { get; set; } = 60;
+
+    // Lectura en voz alta de instrucciones (Texto a voz)
+    public bool TextoAVoz { get; set; } = true;
+
     // Supresión de transiciones bruscas o destellos
     public bool AnimacionesReducidas { get; set; } = true;
 

@@ -586,6 +586,9 @@ namespace TeaLearning.Data.Migrations
                     b.Property<Guid>("StudentProfileId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("TextoAVoz")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Tipografia")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -593,6 +596,9 @@ namespace TeaLearning.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("VolumenAudio")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

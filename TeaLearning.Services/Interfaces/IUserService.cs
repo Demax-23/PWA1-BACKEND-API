@@ -7,5 +7,7 @@ public interface IUserService
 {
     Task<ApiResponse<List<UserDto>>> GetAllUsersAsync();
     Task<ApiResponse<UserDto>> GetUserByIdAsync(Guid id);
+    Task<ApiResponse<UserDto>> UpdateUserAsync(Guid id, UpdateUserDto dto);
     Task<ApiResponse<UserDto>> UpdateUserRolesAsync(Guid id, UpdateUserRolesDto dto);
+    Task<ApiResponse<bool>> DeleteUserAsync(Guid id);
 }

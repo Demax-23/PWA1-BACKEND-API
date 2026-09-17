@@ -187,6 +187,8 @@ public static class DatabaseSeeder
                     Tipografia = "Atkinson Hyperlegible",
                     MayorEspacioEntreLetras = false,
                     AudioActivo = true,
+                    VolumenAudio = 60,
+                    TextoAVoz = true,
                     AnimacionesReducidas = true,
                     NivelEscalaFuente = 2,
                     ModoContraste = ModoContraste.Estandar,

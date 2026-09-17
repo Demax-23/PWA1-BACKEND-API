@@ -105,8 +105,11 @@ public class AuthService : IAuthService
             {
                 StudentProfileId = studentProfile.Id,
                 PaletaColor = "PastelSuave",
-                Tipografia = "OpenDyslexic",
+                Tipografia = "Atkinson Hyperlegible",
+                MayorEspacioEntreLetras = false,
                 AudioActivo = true,
+                VolumenAudio = 60,
+                TextoAVoz = true,
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
                 ModoContraste = ModoContraste.Estandar,

@@ -40,6 +40,8 @@ public class SensoryPreferenceService : ISensoryPreferenceService
                 Tipografia = "Atkinson Hyperlegible",
                 MayorEspacioEntreLetras = false,
                 AudioActivo = true,
+                VolumenAudio = 60,
+                TextoAVoz = true,
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
                 ModoContraste = Core.Enums.ModoContraste.Estandar,
@@ -56,6 +58,8 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             Tipografia = pref.Tipografia,
             MayorEspacioEntreLetras = pref.MayorEspacioEntreLetras,
             AudioActivo = pref.AudioActivo,
+            VolumenAudio = pref.VolumenAudio,
+            TextoAVoz = pref.TextoAVoz,
             AnimacionesReducidas = pref.AnimacionesReducidas,
             NivelEscalaFuente = pref.NivelEscalaFuente,
             ModoContraste = pref.ModoContraste,
@@ -100,6 +104,8 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             Tipografia = pref.Tipografia,
             MayorEspacioEntreLetras = pref.MayorEspacioEntreLetras,
             AudioActivo = pref.AudioActivo,
+            VolumenAudio = pref.VolumenAudio,
+            TextoAVoz = pref.TextoAVoz,
             AnimacionesReducidas = pref.AnimacionesReducidas,
             NivelEscalaFuente = pref.NivelEscalaFuente,
             ModoContraste = pref.ModoContraste,
@@ -115,6 +121,14 @@ public class SensoryPreferenceService : ISensoryPreferenceService
         entity.Tipografia = dto.Tipografia;
         entity.MayorEspacioEntreLetras = dto.MayorEspacioEntreLetras;
         entity.AudioActivo = dto.AudioActivo;
+        if (dto.VolumenAudio.HasValue)
+        {
+            entity.VolumenAudio = dto.VolumenAudio.Value;
+        }
+        if (dto.TextoAVoz.HasValue)
+        {
+            entity.TextoAVoz = dto.TextoAVoz.Value;
+        }
         entity.AnimacionesReducidas = dto.AnimacionesReducidas;
         entity.NivelEscalaFuente = dto.NivelEscalaFuente;
         entity.ModoContraste = dto.ModoContraste;

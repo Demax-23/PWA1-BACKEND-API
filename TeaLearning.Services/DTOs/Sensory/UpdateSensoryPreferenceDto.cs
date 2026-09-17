@@ -15,6 +15,11 @@ public class UpdateSensoryPreferenceDto
 
     public bool AudioActivo { get; set; }
 
+    [Range(0, 100, ErrorMessage = "El volumen de audio debe estar entre 0 y 100")]
+    public int? VolumenAudio { get; set; }
+
+    public bool? TextoAVoz { get; set; }
+
     public bool AnimacionesReducidas { get; set; }
 
     [Range(1, 4, ErrorMessage = "El nivel de escala de fuente debe estar entre 1 y 4")]

@@ -9,6 +9,8 @@ public class SensoryPreferenceDto
     public string PaletaColor { get; set; } = "PastelSuave";
     public string Tipografia { get; set; } = "OpenDyslexic";
     public bool AudioActivo { get; set; }
+    public int VolumenAudio { get; set; } = 60;
+    public bool TextoAVoz { get; set; } = true;
     public bool AnimacionesReducidas { get; set; }
     public int NivelEscalaFuente { get; set; }
     public ModoContraste ModoContraste { get; set; }
