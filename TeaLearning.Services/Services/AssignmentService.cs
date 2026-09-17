@@ -1,0 +1,177 @@
+using Microsoft.EntityFrameworkCore;
+using TeaLearning.Core.Entities;
+using TeaLearning.Core.Enums;
+using TeaLearning.Data.Context;
+using TeaLearning.Data.Repositories;
+using TeaLearning.Services.Common;
+using TeaLearning.Services.DTOs.Assignments;
+using TeaLearning.Services.Interfaces;
+
+namespace TeaLearning.Services.Services;
+
+public class AssignmentService : IAssignmentService
+{
+    private readonly IActivityAssignmentRepository _assignmentRepository;
+    private readonly IActivityRepository _activityRepository;
+    private readonly IStudentRepository _studentRepository;
+    private readonly ApplicationDbContext _context;
+
+    public AssignmentService(
+        IActivityAssignmentRepository assignmentRepository,
+        IActivityRepository activityRepository,
+        IStudentRepository studentRepository,
+        ApplicationDbContext context)
+    {
+        _assignmentRepository = assignmentRepository;
+        _activityRepository = activityRepository;
+        _studentRepository = studentRepository;
+        _context = context;
+    }
+
+    public async Task<ApiResponse<List<AssignmentDto>>> CreateAssignmentAsync(
+        CreateAssignmentDto dto, 
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validar que la actividad exista y esté activa
+        var activity = await _activityRepository.GetByIdAsync(dto.ActivityId, cancellationToken);
+        if (activity == null)
+        {
+            return ApiResponse<List<AssignmentDto>>.Fail($"La actividad pedagógica con ID {dto.ActivityId} no existe.");
+        }
+
+        var createdAssignments = new List<ActivityAssignment>();
+
+        // 2. Asignación Individual
+        if (dto.StudentProfileId.HasValue)
+        {
+            var student = await _studentRepository.GetByIdAsync(dto.StudentProfileId.Value, cancellationToken);
+            if (student == null)
+            {
+                return ApiResponse<List<AssignmentDto>>.Fail($"El estudiante con ID {dto.StudentProfileId.Value} no existe.");
+            }
+
+            var assignment = new ActivityAssignment
+            {
+                ActivityId = dto.ActivityId,
+                StudentProfileId = dto.StudentProfileId.Value,
+                FechaInicio = dto.FechaInicio,
+                FechaLimite = dto.FechaLimite,
+                OrdenSecuencial = dto.OrdenSecuencial,
+                Prioridad = dto.Prioridad,
+                Estado = EstadoAsignacion.Pendiente,
+                IsActive = true
+            };
+
+            await _assignmentRepository.AddAsync(assignment, cancellationToken);
+            createdAssignments.Add(assignment);
+        }
+        // 3. Asignación Masiva por Aula
+        else if (dto.ClassroomId.HasValue)
+        {
+            var classroom = await _context.Classrooms
+                .Include(c => c.Students.Where(s => s.IsActive))
+                .FirstOrDefaultAsync(c => c.Id == dto.ClassroomId.Value && c.IsActive, cancellationToken);
+
+            if (classroom == null)
+            {
+                return ApiResponse<List<AssignmentDto>>.Fail($"El aula con ID {dto.ClassroomId.Value} no existe.");
+            }
+
+            var students = classroom.Students.ToList();
+            if (!students.Any())
+            {
+                return ApiResponse<List<AssignmentDto>>.Fail($"El aula '{classroom.Nombre}' no cuenta con estudiantes activos para asignar actividades.");
+            }
+
+            foreach (var student in students)
+            {
+                createdAssignments.Add(new ActivityAssignment
+                {
+                    ActivityId = dto.ActivityId,
+                    StudentProfileId = student.Id,
+                    FechaInicio = dto.FechaInicio,
+                    FechaLimite = dto.FechaLimite,
+                    OrdenSecuencial = dto.OrdenSecuencial,
+                    Prioridad = dto.Prioridad,
+                    Estado = EstadoAsignacion.Pendiente,
+                    IsActive = true
+                });
+            }
+
+            await _assignmentRepository.AddRangeAsync(createdAssignments, cancellationToken);
+        }
+        else
+        {
+            return ApiResponse<List<AssignmentDto>>.Fail("Debe especificar un StudentProfileId para asignación individual o un ClassroomId para asignación por aula.");
+        }
+
+        // Recuperar con detalles para armar el DTO de respuesta
+        var dtoList = new List<AssignmentDto>();
+        foreach (var a in createdAssignments)
+        {
+            var detailed = await _assignmentRepository.GetWithDetailsAsync(a.Id, cancellationToken);
+            if (detailed != null)
+            {
+                dtoList.Add(MapToDto(detailed));
+            }
+        }
+
+        return ApiResponse<List<AssignmentDto>>.Ok(
+            dtoList, 
+            $"Se crearon exitosamente {dtoList.Count} asignaciones de actividad");
+    }
+
+    public async Task<ApiResponse<List<AssignmentDto>>> GetAssignmentsAsync(
+        Guid? studentProfileId = null, 
+        Guid? classroomId = null, 
+        EstadoAsignacion? estado = null, 
+        CancellationToken cancellationToken = default)
+    {
+        var assignments = await _assignmentRepository.GetFilteredAsync(studentProfileId, classroomId, estado, cancellationToken);
+        var dtoList = assignments.Select(MapToDto).ToList();
+        return ApiResponse<List<AssignmentDto>>.Ok(dtoList, $"Se recuperaron {dtoList.Count} asignaciones");
+    }
+
+    public async Task<ApiResponse<AssignmentDto>> GetAssignmentByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var assignment = await _assignmentRepository.GetWithDetailsAsync(id, cancellationToken);
+        if (assignment == null)
+        {
+            return ApiResponse<AssignmentDto>.Fail($"Asignación con ID {id} no encontrada.");
+        }
+
+        return ApiResponse<AssignmentDto>.Ok(MapToDto(assignment), "Asignación recuperada con éxito");
+    }
+
+    public async Task<ApiResponse<bool>> DeleteAssignmentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var assignment = await _assignmentRepository.GetByIdAsync(id, cancellationToken);
+        if (assignment == null)
+        {
+            return ApiResponse<bool>.Fail($"Asignación con ID {id} no encontrada.");
+        }
+
+        await _assignmentRepository.DeleteAsync(assignment, cancellationToken);
+        return ApiResponse<bool>.Ok(true, "Asignación eliminada exitosamente");
+    }
+
+    private static AssignmentDto MapToDto(ActivityAssignment a)
+    {
+        return new AssignmentDto
+        {
+            Id = a.Id,
+            ActivityId = a.ActivityId,
+            ActivityTitulo = a.Activity?.Titulo ?? string.Empty,
+            TipoActividad = a.Activity?.TipoActividad.ToString() ?? string.Empty,
+            StudentProfileId = a.StudentProfileId,
+            StudentNombre = a.StudentProfile?.User?.NombreCompleto ?? string.Empty,
+            CodigoEstudiante = a.StudentProfile?.CodigoEstudiante ?? string.Empty,
+            FechaInicio = a.FechaInicio,
+            FechaLimite = a.FechaLimite,
+            OrdenSecuencial = a.OrdenSecuencial,
+            Prioridad = a.Prioridad,
+            Estado = a.Estado,
+            CreatedAt = a.CreatedAt
+        };
+    }
+}
