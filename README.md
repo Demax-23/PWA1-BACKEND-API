@@ -13,10 +13,10 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 | **HU-001 - Gestión de Usuarios y Roles** | 5 pts | Autenticación JWT, registro, login, refresh tokens y RBAC para roles `Administrador`, `Docente`, `Estudiante`, `Acudiente`. | ✅ Completado |
 | **HU-002 - Rutina Visual de Actividades** | 5 pts | Endpoint `GET /api/students/me/daily-routine` con asignaciones del día ordenadas estrictamente por su secuencia pedagógica. | ✅ Completado |
 | **HU-003 - Configuración Sensorial Adaptativa** | 5 pts | Configuración de paletas cromáticas, tipografía (ej. OpenDyslexic), supresión de animaciones, escala de fuentes, contraste y temporizadores. | ✅ Completado |
-| **HU-007 - Módulos Temáticos de Aprendizaje** | 3 pts | CRUD administrativo de categorías y módulos pedagógicos (`GET`, `POST`, `PUT`, `DELETE /api/modules`). | ✅ Completado |
 | **HU-004 - Parametrización de Actividades TEA** | 8 pts | Creación y parametrización de actividades con modelo híbrido (metadata relacional + estructura dinámica `ConfigJson`). | ✅ Completado |
 | **HU-005 - Asignación Individual y por Aula** | 3 pts | Asignación de actividades a un estudiante específico o en lote a un aula completa con fechas, prioridad y orden secuencial. | ✅ Completado |
 | **HU-006 - Ejecución Interactiva y Telemetría** | 8 pts | Flujo de inicio (`/start`) con entrega de adaptaciones sensoriales y registro de telemetría de desempeño (`/submit`). | ✅ Completado |
+| **HU-007 - Módulos Temáticos de Aprendizaje** | 3 pts | CRUD administrativo de categorías y módulos pedagógicos (`GET`, `POST`, `PUT`, `DELETE /api/modules`). | ✅ Completado |
 
 ---
 
