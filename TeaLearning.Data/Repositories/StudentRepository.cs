@@ -30,4 +30,17 @@ public class StudentRepository : GenericRepository<StudentProfile>, IStudentRepo
                 .ThenInclude(g => g!.User)
             .FirstOrDefaultAsync(s => s.Id == studentId && s.IsActive, cancellationToken);
     }
+
+    public async Task<List<StudentProfile>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.StudentProfiles
+            .Include(s => s.User)
+            .Include(s => s.SensoryPreference)
+            .Include(s => s.Classroom)
+            .Include(s => s.GuardianProfile)
+                .ThenInclude(g => g!.User)
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.User.Nombres)
+            .ToListAsync(cancellationToken);
+    }
 }

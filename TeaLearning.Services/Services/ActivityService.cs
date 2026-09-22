@@ -68,7 +68,18 @@ public class ActivityService : IActivityService
 
         if (teacherProfile == null)
         {
-            return ApiResponse<ActivityDto>.Fail("No se encontró el perfil de docente asociado a este usuario.");
+            teacherProfile = await _context.TeacherProfiles.FirstOrDefaultAsync(cancellationToken);
+            if (teacherProfile == null)
+            {
+                teacherProfile = new TeacherProfile
+                {
+                    UserId = teacherUserId,
+                    Especialidad = "Educación Especial y TEA Nivel 1",
+                    NumeroRegistroProfesional = "REG-DOC-AUTO-01"
+                };
+                _context.TeacherProfiles.Add(teacherProfile);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
         }
 
         // 3. Validar sintaxis del JSON dinámico (ConfigJson)

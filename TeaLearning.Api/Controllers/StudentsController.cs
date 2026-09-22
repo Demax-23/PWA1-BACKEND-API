@@ -64,4 +64,16 @@ public class StudentsController : BaseApiController
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Consulta todos los estudiantes activos (Restringido a Docente y Administrador para asignación pedagógica).
+    /// </summary>
+    [HttpGet]
+    [Authorize(Roles = "Docente,Administrador")]
+    [ProducesResponseType(typeof(ApiResponse<List<StudentProfileDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll()
+    {
+        var result = await _studentService.GetAllStudentsAsync();
+        return Ok(result);
+    }
 }

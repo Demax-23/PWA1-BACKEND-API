@@ -83,4 +83,24 @@ public class StudentService : IStudentService
 
         return ApiResponse<StudentProfileDto>.Ok(dto, "Perfil de estudiante recuperado exitosamente");
     }
+
+    public async Task<ApiResponse<List<StudentProfileDto>>> GetAllStudentsAsync(CancellationToken cancellationToken = default)
+    {
+        var students = await _studentRepository.GetAllWithDetailsAsync(cancellationToken);
+        var dtos = students.Select(studentProfile => new StudentProfileDto
+        {
+            Id = studentProfile.Id,
+            UserId = studentProfile.UserId,
+            NombreCompleto = studentProfile.User?.NombreCompleto ?? string.Empty,
+            CodigoEstudiante = studentProfile.CodigoEstudiante,
+            FechaNacimiento = studentProfile.FechaNacimiento,
+            ObservacionesMedicasTEA = studentProfile.ObservacionesMedicasTEA,
+            ClassroomId = studentProfile.ClassroomId,
+            ClassroomNombre = studentProfile.Classroom?.Nombre,
+            GuardianProfileId = studentProfile.GuardianProfileId,
+            GuardianNombre = studentProfile.GuardianProfile?.User?.NombreCompleto
+        }).ToList();
+
+        return ApiResponse<List<StudentProfileDto>>.Ok(dtos, $"Se recuperaron {dtos.Count} estudiantes");
+    }
 }
