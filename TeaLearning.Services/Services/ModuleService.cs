@@ -31,6 +31,8 @@ public class ModuleService : IModuleService
             Descripcion = m.Descripcion,
             Icono = m.Icono,
             Orden = m.Orden,
+            CategoriaId = m.CategoriaId,
+            CategoriaNombre = m.Categoria?.Nombre,
             TotalActividades = m.Activities.Count,
             IsActive = m.IsActive,
             CreatedAt = m.CreatedAt
@@ -76,6 +78,7 @@ public class ModuleService : IModuleService
             Descripcion = dto.Descripcion.Trim(),
             Icono = dto.Icono?.Trim(),
             Orden = dto.Orden,
+            CategoriaId = dto.CategoriaId,
             IsActive = true
         };
 
@@ -88,6 +91,7 @@ public class ModuleService : IModuleService
             Descripcion = module.Descripcion,
             Icono = module.Icono,
             Orden = module.Orden,
+            CategoriaId = module.CategoriaId,
             TotalActividades = 0,
             IsActive = module.IsActive,
             CreatedAt = module.CreatedAt
@@ -108,6 +112,7 @@ public class ModuleService : IModuleService
         module.Descripcion = dto.Descripcion.Trim();
         module.Icono = dto.Icono?.Trim();
         module.Orden = dto.Orden;
+        module.CategoriaId = dto.CategoriaId;
         module.IsActive = dto.IsActive;
 
         await _moduleRepository.UpdateAsync(module, cancellationToken);
@@ -119,6 +124,7 @@ public class ModuleService : IModuleService
             Descripcion = module.Descripcion,
             Icono = module.Icono,
             Orden = module.Orden,
+            CategoriaId = module.CategoriaId,
             TotalActividades = 0,
             IsActive = module.IsActive,
             CreatedAt = module.CreatedAt

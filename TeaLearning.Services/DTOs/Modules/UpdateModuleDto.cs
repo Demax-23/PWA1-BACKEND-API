@@ -16,6 +16,7 @@ public class UpdateModuleDto
     public string? Icono { get; set; }
 
     public int Orden { get; set; } = 1;
+    public Guid? CategoriaId { get; set; }
 
     public bool IsActive { get; set; } = true;
 }

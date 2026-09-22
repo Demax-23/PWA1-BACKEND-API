@@ -203,7 +203,51 @@ public static class DatabaseSeeder
             studentProfile = await context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == studentUser.Id);
         }
 
-        // 7. Sembrar Módulo, Actividades y Asignaciones para la Rutina Diaria
+        // 7. Sembrar Categorías de Aprendizaje (HU-007)
+        var catComunicacion = await context.LearningCategories.FirstOrDefaultAsync(c => c.Nombre == "Comunicación");
+        if (catComunicacion == null)
+        {
+            catComunicacion = new LearningCategory
+            {
+                Nombre = "Comunicación",
+                Descripcion = "Habilidades para expresar necesidades, ideas y opiniones.",
+                Color = "#2F6E5C",
+                Orden = 1,
+                IsActive = true
+            };
+            context.LearningCategories.Add(catComunicacion);
+        }
+
+        var catRutinas = await context.LearningCategories.FirstOrDefaultAsync(c => c.Nombre == "Rutinas diarias");
+        if (catRutinas == null)
+        {
+            catRutinas = new LearningCategory
+            {
+                Nombre = "Rutinas diarias",
+                Descripcion = "Actividades de la vida cotidiana: higiene, orden, tiempo.",
+                Color = "#9C7A4C",
+                Orden = 2,
+                IsActive = true
+            };
+            context.LearningCategories.Add(catRutinas);
+        }
+
+        var catSociales = await context.LearningCategories.FirstOrDefaultAsync(c => c.Nombre == "Habilidades sociales");
+        if (catSociales == null)
+        {
+            catSociales = new LearningCategory
+            {
+                Nombre = "Habilidades sociales",
+                Descripcion = "Interacción con pares y adultos, turnos, juego compartido.",
+                Color = "#3B6D11",
+                Orden = 3,
+                IsActive = false
+            };
+            context.LearningCategories.Add(catSociales);
+        }
+        await context.SaveChangesAsync();
+
+        // 8. Sembrar Módulo, Actividades y Asignaciones para la Rutina Diaria
         if (teacherProfile != null && studentProfile != null && !await context.LearningModules.AnyAsync())
         {
             var module = new LearningModule
@@ -211,7 +255,8 @@ public static class DatabaseSeeder
                 Titulo = "Módulo 1: Identificación y Gestión Emocional",
                 Descripcion = "Reconocimiento y comprensión de expresiones faciales y emociones básicas.",
                 Icono = "smile",
-                Orden = 1
+                Orden = 1,
+                CategoriaId = catComunicacion.Id
             };
             context.LearningModules.Add(module);
             await context.SaveChangesAsync();
@@ -264,6 +309,17 @@ public static class DatabaseSeeder
             };
 
             context.ActivityAssignments.AddRange(assignment1, assignment2);
+            await context.SaveChangesAsync();
+        }
+
+        // Vincular módulos existentes que no tengan CategoriaId
+        var unlinkedModules = await context.LearningModules.Where(m => m.CategoriaId == null).ToListAsync();
+        if (unlinkedModules.Any() && catComunicacion != null)
+        {
+            foreach (var m in unlinkedModules)
+            {
+                m.CategoriaId = catComunicacion.Id;
+            }
             await context.SaveChangesAsync();
         }
     }

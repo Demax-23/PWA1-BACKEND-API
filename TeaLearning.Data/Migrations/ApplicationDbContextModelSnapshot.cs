@@ -471,10 +471,57 @@ namespace TeaLearning.Data.Migrations
                     b.ToTable("GuardianProfiles", (string)null);
                 });
 
+            modelBuilder.Entity("TeaLearning.Core.Entities.LearningCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("#2F6E5C");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Orden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nombre");
+
+                    b.ToTable("LearningCategories", (string)null);
+                });
+
             modelBuilder.Entity("TeaLearning.Core.Entities.LearningModule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CategoriaId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -504,6 +551,8 @@ namespace TeaLearning.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoriaId");
 
                     b.ToTable("LearningModules", (string)null);
                 });
@@ -824,6 +873,16 @@ namespace TeaLearning.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TeaLearning.Core.Entities.LearningModule", b =>
+                {
+                    b.HasOne("TeaLearning.Core.Entities.LearningCategory", "Categoria")
+                        .WithMany("Modules")
+                        .HasForeignKey("CategoriaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Categoria");
+                });
+
             modelBuilder.Entity("TeaLearning.Core.Entities.PedagogicalNote", b =>
                 {
                     b.HasOne("TeaLearning.Core.Entities.StudentProfile", "StudentProfile")
@@ -917,6 +976,11 @@ namespace TeaLearning.Data.Migrations
             modelBuilder.Entity("TeaLearning.Core.Entities.GuardianProfile", b =>
                 {
                     b.Navigation("Students");
+                });
+
+            modelBuilder.Entity("TeaLearning.Core.Entities.LearningCategory", b =>
+                {
+                    b.Navigation("Modules");
                 });
 
             modelBuilder.Entity("TeaLearning.Core.Entities.LearningModule", b =>

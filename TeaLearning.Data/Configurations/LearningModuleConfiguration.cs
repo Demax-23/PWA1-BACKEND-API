@@ -23,6 +23,11 @@ public class LearningModuleConfiguration : IEntityTypeConfiguration<LearningModu
         builder.Property(m => m.Icono)
             .HasMaxLength(100);
 
+        builder.HasOne(m => m.Categoria)
+            .WithMany(c => c.Modules)
+            .HasForeignKey(m => m.CategoriaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(m => m.Activities)
             .WithOne(a => a.Modulo)
             .HasForeignKey(a => a.ModuloId)

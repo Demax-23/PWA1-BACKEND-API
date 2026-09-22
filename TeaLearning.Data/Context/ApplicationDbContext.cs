@@ -16,6 +16,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
     public DbSet<Classroom> Classrooms => Set<Classroom>();
     public DbSet<SensoryPreference> SensoryPreferences => Set<SensoryPreference>();
+    public DbSet<LearningCategory> LearningCategories => Set<LearningCategory>();
     public DbSet<LearningModule> LearningModules => Set<LearningModule>();
     public DbSet<Activity> Activities => Set<Activity>();
     public DbSet<ActivityAssignment> ActivityAssignments => Set<ActivityAssignment>();

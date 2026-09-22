@@ -72,6 +72,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentRepository, StudentRepository>();
         services.AddScoped<ISensoryPreferenceRepository, SensoryPreferenceRepository>();
         services.AddScoped<IActivityAssignmentRepository, ActivityAssignmentRepository>();
+        services.AddScoped<ILearningCategoryRepository, LearningCategoryRepository>();
         services.AddScoped<ILearningModuleRepository, LearningModuleRepository>();
         services.AddScoped<IActivityRepository, ActivityRepository>();
         services.AddScoped<IActivityExecutionRepository, ActivityExecutionRepository>();
@@ -82,6 +83,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<ISensoryPreferenceService, SensoryPreferenceService>();
+        services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IModuleService, ModuleService>();
         services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IAssignmentService, AssignmentService>();

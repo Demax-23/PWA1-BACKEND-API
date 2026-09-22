@@ -13,6 +13,7 @@ public class LearningModuleRepository : GenericRepository<LearningModule>, ILear
     public async Task<IReadOnlyList<LearningModule>> GetAllWithActivitiesCountAsync(CancellationToken cancellationToken = default)
     {
         return await _context.LearningModules
+            .Include(m => m.Categoria)
             .Include(m => m.Activities.Where(a => a.IsActive))
             .Where(m => m.IsActive)
             .OrderBy(m => m.Orden)
@@ -22,6 +23,7 @@ public class LearningModuleRepository : GenericRepository<LearningModule>, ILear
     public async Task<LearningModule?> GetWithActivitiesAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.LearningModules
+            .Include(m => m.Categoria)
             .Include(m => m.Activities.Where(a => a.IsActive))
             .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, cancellationToken);
     }

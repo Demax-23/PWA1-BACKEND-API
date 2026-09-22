@@ -16,4 +16,6 @@ public class CreateModuleDto
     public string? Icono { get; set; }
 
     public int Orden { get; set; } = 1;
+
+    public Guid? CategoriaId { get; set; }
 }
