@@ -30,6 +30,8 @@ public class UserService : IUserService
             .Include(u => u.StudentProfile)
             .Include(u => u.TeacherProfile)
             .Include(u => u.GuardianProfile)
+                .ThenInclude(g => g!.Students)
+                    .ThenInclude(s => s.User)
             .OrderBy(u => u.Nombres)
             .ToListAsync();
 
@@ -38,6 +40,16 @@ public class UserService : IUserService
         foreach (var user in users)
         {
             var roles = await _userManager.GetRolesAsync(user);
+            var studentUserIds = user.GuardianProfile?.Students
+                .Where(s => s.IsActive)
+                .Select(s => s.UserId)
+                .ToList() ?? new List<Guid>();
+
+            var studentNombres = user.GuardianProfile?.Students
+                .Where(s => s.IsActive)
+                .Select(s => s.User?.NombreCompleto ?? string.Empty)
+                .ToList() ?? new List<string>();
+
             dtoList.Add(new UserDto
             {
                 Id = user.Id,
@@ -51,7 +63,9 @@ public class UserService : IUserService
                 UltimaActividadAt = user.UltimaActividadAt,
                 EstudianteId = user.StudentProfile?.Id,
                 DocenteId = user.TeacherProfile?.Id,
-                AcudienteId = user.GuardianProfile?.Id
+                AcudienteId = user.GuardianProfile?.Id,
+                StudentUserIds = studentUserIds,
+                StudentNombres = studentNombres
             });
         }
 
@@ -64,6 +78,8 @@ public class UserService : IUserService
             .Include(u => u.StudentProfile)
             .Include(u => u.TeacherProfile)
             .Include(u => u.GuardianProfile)
+                .ThenInclude(g => g!.Students)
+                    .ThenInclude(s => s.User)
             .FirstOrDefaultAsync(u => u.Id == id);
 
         if (user == null)
@@ -72,6 +88,15 @@ public class UserService : IUserService
         }
 
         var roles = await _userManager.GetRolesAsync(user);
+        var studentUserIds = user.GuardianProfile?.Students
+            .Where(s => s.IsActive)
+            .Select(s => s.UserId)
+            .ToList() ?? new List<Guid>();
+
+        var studentNombres = user.GuardianProfile?.Students
+            .Where(s => s.IsActive)
+            .Select(s => s.User?.NombreCompleto ?? string.Empty)
+            .ToList() ?? new List<string>();
 
         var dto = new UserDto
         {
@@ -86,7 +111,9 @@ public class UserService : IUserService
             UltimaActividadAt = user.UltimaActividadAt,
             EstudianteId = user.StudentProfile?.Id,
             DocenteId = user.TeacherProfile?.Id,
-            AcudienteId = user.GuardianProfile?.Id
+            AcudienteId = user.GuardianProfile?.Id,
+            StudentUserIds = studentUserIds,
+            StudentNombres = studentNombres
         };
 
         return ApiResponse<UserDto>.Ok(dto, "Usuario recuperado exitosamente");
@@ -275,5 +302,68 @@ public class UserService : IUserService
         }
 
         return ApiResponse<bool>.Ok(true, "Usuario eliminado permanentemente de la base de datos.");
+    }
+
+    public async Task<ApiResponse<List<Guid>>> LinkStudentsToGuardianAsync(Guid guardianUserId, List<Guid> studentIds)
+    {
+        var user = await _userManager.FindByIdAsync(guardianUserId.ToString());
+        if (user == null)
+        {
+            return ApiResponse<List<Guid>>.Fail("Usuario no encontrado.");
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        if (!roles.Contains("Acudiente"))
+        {
+            return ApiResponse<List<Guid>>.Fail("El usuario especificado no cuenta con el rol de Acudiente.");
+        }
+
+        var guardian = await _context.GuardianProfiles
+            .Include(g => g.Students)
+            .FirstOrDefaultAsync(g => g.UserId == guardianUserId);
+
+        if (guardian == null)
+        {
+            guardian = new GuardianProfile
+            {
+                UserId = user.Id,
+                TelefonoContacto = "Sin especificar",
+                Parentesco = "Familiar"
+            };
+            _context.GuardianProfiles.Add(guardian);
+            await _context.SaveChangesAsync();
+        }
+
+        // 1. Desvincular estudiantes actuales que no estén en la nueva lista
+        var currentStudents = await _context.StudentProfiles
+            .Where(s => s.GuardianProfileId == guardian.Id)
+            .ToListAsync();
+
+        foreach (var cs in currentStudents)
+        {
+            if (!studentIds.Contains(cs.Id) && !studentIds.Contains(cs.UserId))
+            {
+                cs.GuardianProfileId = null;
+            }
+        }
+
+        // 2. Vincular los nuevos estudiantes solicitados
+        var targetStudents = new List<StudentProfile>();
+        if (studentIds.Any())
+        {
+            targetStudents = await _context.StudentProfiles
+                .Where(s => studentIds.Contains(s.Id) || studentIds.Contains(s.UserId))
+                .ToListAsync();
+
+            foreach (var ts in targetStudents)
+            {
+                ts.GuardianProfileId = guardian.Id;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        var linkedUserIds = targetStudents.Select(s => s.UserId).ToList();
+        return ApiResponse<List<Guid>>.Ok(linkedUserIds, $"Se vincularon exitosamente {linkedUserIds.Count} estudiantes al acudiente.");
     }
 }

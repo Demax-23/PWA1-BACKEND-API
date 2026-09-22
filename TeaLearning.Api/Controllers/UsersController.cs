@@ -115,4 +115,31 @@ public class UsersController : BaseApiController
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Vincula o desvincula estudiantes a cargo de un acudiente (Solo Administrador).
+    /// </summary>
+    [HttpPut("{id:guid}/students")]
+    [ProducesResponseType(typeof(ApiResponse<List<Guid>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<Guid>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<List<Guid>>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> LinkStudents(Guid id, [FromBody] LinkStudentsDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return BadRequest(ApiResponse<List<Guid>>.Fail("Datos de vinculación inválidos", errors));
+        }
+
+        var result = await _userService.LinkStudentsToGuardianAsync(id, dto.StudentIds);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
 }

@@ -29,4 +29,5 @@ public class RegisterRequestDto
     public DateTime? FechaNacimiento { get; set; }
     public Guid? ClassroomId { get; set; }
     public Guid? GuardianProfileId { get; set; }
+    public List<Guid>? StudentIds { get; set; }
 }

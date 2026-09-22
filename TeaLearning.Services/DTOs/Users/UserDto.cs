@@ -16,4 +16,8 @@ public class UserDto
     public Guid? EstudianteId { get; set; }
     public Guid? DocenteId { get; set; }
     public Guid? AcudienteId { get; set; }
+
+    // Estudiantes a cargo si el usuario tiene rol Acudiente
+    public List<Guid> StudentUserIds { get; set; } = new List<Guid>();
+    public List<string> StudentNombres { get; set; } = new List<string>();
 }

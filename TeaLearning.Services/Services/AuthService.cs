@@ -140,6 +140,20 @@ public class AuthService : IAuthService
             _context.GuardianProfiles.Add(guardianProfile);
             await _context.SaveChangesAsync();
             guardianId = guardianProfile.Id;
+
+            // Vincular estudiantes seleccionados si se especificaron
+            if (dto.StudentIds != null && dto.StudentIds.Any())
+            {
+                var students = await _context.StudentProfiles
+                    .Where(s => dto.StudentIds.Contains(s.Id) || dto.StudentIds.Contains(s.UserId))
+                    .ToListAsync();
+
+                foreach (var student in students)
+                {
+                    student.GuardianProfileId = guardianProfile.Id;
+                }
+                await _context.SaveChangesAsync();
+            }
         }
 
         // 6. Generar JWT y Refresh Token
@@ -151,6 +165,18 @@ public class AuthService : IAuthService
         user.RefreshToken = refreshToken;
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(refreshDurationDays);
         await _userManager.UpdateAsync(user);
+
+        var linkedStudentUserIds = new List<Guid>();
+        var linkedStudentNombres = new List<string>();
+        if (guardianId.HasValue)
+        {
+            var linkedStudents = await _context.StudentProfiles
+                .Include(s => s.User)
+                .Where(s => s.GuardianProfileId == guardianId.Value)
+                .ToListAsync();
+            linkedStudentUserIds = linkedStudents.Select(s => s.UserId).ToList();
+            linkedStudentNombres = linkedStudents.Select(s => s.User.NombreCompleto).ToList();
+        }
 
         var authResponse = new AuthResponseDto
         {
@@ -170,7 +196,9 @@ public class AuthService : IAuthService
                 UltimaActividadAt = user.UltimaActividadAt,
                 EstudianteId = studentId,
                 DocenteId = teacherId,
-                AcudienteId = guardianId
+                AcudienteId = guardianId,
+                StudentUserIds = linkedStudentUserIds,
+                StudentNombres = linkedStudentNombres
             }
         };
 
