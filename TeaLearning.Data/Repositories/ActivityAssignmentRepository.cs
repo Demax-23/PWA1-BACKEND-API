@@ -54,7 +54,7 @@ public class ActivityAssignmentRepository : GenericRepository<ActivityAssignment
                 .ThenInclude(a => a.Modulo)
             .Include(aa => aa.StudentProfile)
                 .ThenInclude(s => s.User)
-            .Where(aa => aa.IsActive);
+            .Where(aa => aa.IsActive && aa.Activity.IsActive);
 
         if (studentProfileId.HasValue)
         {

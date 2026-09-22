@@ -50,20 +50,37 @@ public class AssignmentService : IAssignmentService
                 return ApiResponse<List<AssignmentDto>>.Fail($"El estudiante con ID {dto.StudentProfileId.Value} no existe.");
             }
 
-            var assignment = new ActivityAssignment
-            {
-                ActivityId = dto.ActivityId,
-                StudentProfileId = dto.StudentProfileId.Value,
-                FechaInicio = dto.FechaInicio,
-                FechaLimite = dto.FechaLimite,
-                OrdenSecuencial = dto.OrdenSecuencial,
-                Prioridad = dto.Prioridad,
-                Estado = EstadoAsignacion.Pendiente,
-                IsActive = true
-            };
+            var existingAssignment = await _context.ActivityAssignments
+                .FirstOrDefaultAsync(aa => aa.ActivityId == dto.ActivityId 
+                                        && aa.StudentProfileId == dto.StudentProfileId.Value 
+                                        && aa.IsActive, cancellationToken);
 
-            await _assignmentRepository.AddAsync(assignment, cancellationToken);
-            createdAssignments.Add(assignment);
+            if (existingAssignment != null)
+            {
+                existingAssignment.FechaInicio = dto.FechaInicio;
+                if (dto.FechaLimite.HasValue) existingAssignment.FechaLimite = dto.FechaLimite;
+                existingAssignment.OrdenSecuencial = dto.OrdenSecuencial;
+                existingAssignment.Prioridad = dto.Prioridad;
+                await _context.SaveChangesAsync(cancellationToken);
+                createdAssignments.Add(existingAssignment);
+            }
+            else
+            {
+                var assignment = new ActivityAssignment
+                {
+                    ActivityId = dto.ActivityId,
+                    StudentProfileId = dto.StudentProfileId.Value,
+                    FechaInicio = dto.FechaInicio,
+                    FechaLimite = dto.FechaLimite,
+                    OrdenSecuencial = dto.OrdenSecuencial,
+                    Prioridad = dto.Prioridad,
+                    Estado = EstadoAsignacion.Pendiente,
+                    IsActive = true
+                };
+
+                await _assignmentRepository.AddAsync(assignment, cancellationToken);
+                createdAssignments.Add(assignment);
+            }
         }
         // 3. Asignación Masiva por Aula
         else if (dto.ClassroomId.HasValue)
@@ -83,22 +100,47 @@ public class AssignmentService : IAssignmentService
                 return ApiResponse<List<AssignmentDto>>.Fail($"El aula '{classroom.Nombre}' no cuenta con estudiantes activos para asignar actividades.");
             }
 
+            var assignmentsToAdd = new List<ActivityAssignment>();
             foreach (var student in students)
             {
-                createdAssignments.Add(new ActivityAssignment
+                var existingAssignment = await _context.ActivityAssignments
+                    .FirstOrDefaultAsync(aa => aa.ActivityId == dto.ActivityId 
+                                            && aa.StudentProfileId == student.Id 
+                                            && aa.IsActive, cancellationToken);
+                if (existingAssignment != null)
                 {
-                    ActivityId = dto.ActivityId,
-                    StudentProfileId = student.Id,
-                    FechaInicio = dto.FechaInicio,
-                    FechaLimite = dto.FechaLimite,
-                    OrdenSecuencial = dto.OrdenSecuencial,
-                    Prioridad = dto.Prioridad,
-                    Estado = EstadoAsignacion.Pendiente,
-                    IsActive = true
-                });
+                    existingAssignment.FechaInicio = dto.FechaInicio;
+                    if (dto.FechaLimite.HasValue) existingAssignment.FechaLimite = dto.FechaLimite;
+                    existingAssignment.OrdenSecuencial = dto.OrdenSecuencial;
+                    existingAssignment.Prioridad = dto.Prioridad;
+                    createdAssignments.Add(existingAssignment);
+                }
+                else
+                {
+                    var newAssignment = new ActivityAssignment
+                    {
+                        ActivityId = dto.ActivityId,
+                        StudentProfileId = student.Id,
+                        FechaInicio = dto.FechaInicio,
+                        FechaLimite = dto.FechaLimite,
+                        OrdenSecuencial = dto.OrdenSecuencial,
+                        Prioridad = dto.Prioridad,
+                        Estado = EstadoAsignacion.Pendiente,
+                        IsActive = true
+                    };
+                    assignmentsToAdd.Add(newAssignment);
+                    createdAssignments.Add(newAssignment);
+                }
             }
 
-            await _assignmentRepository.AddRangeAsync(createdAssignments, cancellationToken);
+            if (assignmentsToAdd.Any())
+            {
+                await _assignmentRepository.AddRangeAsync(assignmentsToAdd, cancellationToken);
+            }
+            else
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
         }
         else
         {
