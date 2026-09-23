@@ -72,6 +72,11 @@ public class ModuleService : IModuleService
 
     public async Task<ApiResponse<ModuleDto>> CreateModuleAsync(CreateModuleDto dto, CancellationToken cancellationToken = default)
     {
+        if (dto.CategoriaId.HasValue)
+        {
+            await _moduleRepository.ShiftOrdersAsync(dto.CategoriaId.Value, dto.Orden, 1, null, cancellationToken);
+        }
+
         var module = new LearningModule
         {
             Titulo = dto.Titulo.Trim(),
@@ -106,6 +111,15 @@ public class ModuleService : IModuleService
         if (module == null)
         {
             return ApiResponse<ModuleDto>.Fail($"Módulo temático con ID {id} no encontrado.");
+        }
+
+        if (module.CategoriaId == dto.CategoriaId && dto.CategoriaId.HasValue && module.Orden != dto.Orden)
+        {
+            await _moduleRepository.ReorderOnUpdateAsync(dto.CategoriaId.Value, module.Orden, dto.Orden, module.Id, cancellationToken);
+        }
+        else if (module.CategoriaId != dto.CategoriaId && dto.CategoriaId.HasValue)
+        {
+            await _moduleRepository.ShiftOrdersAsync(dto.CategoriaId.Value, dto.Orden, 1, null, cancellationToken);
         }
 
         module.Titulo = dto.Titulo.Trim();

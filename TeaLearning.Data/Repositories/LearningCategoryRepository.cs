@@ -74,4 +74,53 @@ public class LearningCategoryRepository : GenericRepository<LearningCategory>, I
         return await _context.LearningCategories
             .AnyAsync(c => c.Nombre.ToLower() == normalized && (!excludeId.HasValue || c.Id != excludeId.Value), cancellationToken);
     }
+
+    public async Task ShiftOrdersAsync(int fromOrder, int delta, Guid? excludeId = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.LearningCategories.Where(c => c.Orden >= fromOrder);
+        if (excludeId.HasValue)
+        {
+            query = query.Where(c => c.Id != excludeId.Value);
+        }
+
+        var categories = await query.ToListAsync(cancellationToken);
+        if (categories.Any())
+        {
+            foreach (var cat in categories.OrderByDescending(c => c.Orden))
+            {
+                cat.Orden += delta;
+                cat.UpdatedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task ReorderOnUpdateAsync(int oldOrder, int newOrder, Guid currentId, CancellationToken cancellationToken = default)
+    {
+        if (oldOrder == newOrder) return;
+
+        IQueryable<LearningCategory> query;
+        int delta;
+        if (newOrder < oldOrder)
+        {
+            query = _context.LearningCategories.Where(c => c.Id != currentId && c.Orden >= newOrder && c.Orden < oldOrder);
+            delta = 1;
+        }
+        else
+        {
+            query = _context.LearningCategories.Where(c => c.Id != currentId && c.Orden <= newOrder && c.Orden > oldOrder);
+            delta = -1;
+        }
+
+        var items = await query.ToListAsync(cancellationToken);
+        if (items.Any())
+        {
+            foreach (var item in items)
+            {
+                item.Orden += delta;
+                item.UpdatedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

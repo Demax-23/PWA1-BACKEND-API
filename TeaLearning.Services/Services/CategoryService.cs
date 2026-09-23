@@ -66,6 +66,8 @@ public class CategoryService : ICategoryService
             return ApiResponse<CategoryDto>.Fail($"Ya existe una categoría pedagógica con el nombre '{trimmedName}'.");
         }
 
+        await _categoryRepository.ShiftOrdersAsync(dto.Orden, 1, null, cancellationToken);
+
         var category = new LearningCategory
         {
             Nombre = trimmedName,
@@ -104,6 +106,11 @@ public class CategoryService : ICategoryService
         if (await _categoryRepository.ExistsByNameAsync(trimmedName, id, cancellationToken))
         {
             return ApiResponse<CategoryDto>.Fail($"Ya existe otra categoría pedagógica con el nombre '{trimmedName}'.");
+        }
+
+        if (category.Orden != dto.Orden)
+        {
+            await _categoryRepository.ReorderOnUpdateAsync(category.Orden, dto.Orden, category.Id, cancellationToken);
         }
 
         category.Nombre = trimmedName;
