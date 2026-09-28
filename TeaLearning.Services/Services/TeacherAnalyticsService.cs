@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using TeaLearning.Core.Entities;
 using TeaLearning.Core.Enums;
 using TeaLearning.Data.Context;
 using TeaLearning.Data.Repositories;
@@ -129,20 +130,31 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
     }
 
     public async Task<ApiResponse<TeacherClassroomSummaryDto>> GetClassroomAnalyticsSummaryAsync(
-        Guid classroomId, 
+        Guid? classroomId = null, 
         CancellationToken cancellationToken = default)
     {
-        var classroom = await _context.Classrooms
-            .Include(c => c.Students.Where(s => s.IsActive))
-                .ThenInclude(s => s.User)
-            .FirstOrDefaultAsync(c => c.Id == classroomId && c.IsActive, cancellationToken);
+        Classroom? classroom = null;
+        if (classroomId.HasValue)
+        {
+            classroom = await _context.Classrooms
+                .Include(c => c.Students.Where(s => s.IsActive))
+                    .ThenInclude(s => s.User)
+                .FirstOrDefaultAsync(c => c.Id == classroomId.Value && c.IsActive, cancellationToken);
+        }
+        else
+        {
+            classroom = await _context.Classrooms
+                .Include(c => c.Students.Where(s => s.IsActive))
+                    .ThenInclude(s => s.User)
+                .FirstOrDefaultAsync(c => c.IsActive, cancellationToken);
+        }
 
         if (classroom == null)
         {
-            return ApiResponse<TeacherClassroomSummaryDto>.Fail($"Aula con ID {classroomId} no encontrada.");
+            return ApiResponse<TeacherClassroomSummaryDto>.Fail($"Aula {(classroomId.HasValue ? $"con ID {classroomId.Value}" : "activa")} no encontrada.");
         }
 
-        var executions = await _executionRepository.GetByClassroomIdWithDetailsAsync(classroomId, cancellationToken);
+        var executions = await _executionRepository.GetByClassroomIdWithDetailsAsync(classroom.Id, cancellationToken);
 
         int totalAciertos = executions.Sum(e => e.CantidadAciertos);
         int totalFallos = executions.Sum(e => e.CantidadIntentosFallidos);

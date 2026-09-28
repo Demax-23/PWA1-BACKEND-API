@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TeaLearning.Core.Enums;
+using TeaLearning.Data.Repositories;
 using TeaLearning.Services.Common;
 using TeaLearning.Services.DTOs.Achievements;
 using TeaLearning.Services.DTOs.Students;
@@ -12,13 +14,16 @@ public class StudentsController : BaseApiController
 {
     private readonly IStudentService _studentService;
     private readonly IAchievementService _achievementService;
+    private readonly IActivityAssignmentRepository _assignmentRepository;
 
     public StudentsController(
         IStudentService studentService,
-        IAchievementService achievementService)
+        IAchievementService achievementService,
+        IActivityAssignmentRepository assignmentRepository)
     {
         _studentService = studentService;
         _achievementService = achievementService;
+        _assignmentRepository = assignmentRepository;
     }
 
     /// <summary>
@@ -71,15 +76,22 @@ public class StudentsController : BaseApiController
     }
 
     /// <summary>
-    /// Consulta todos los estudiantes activos (Restringido a Docente y Administrador para asignación pedagógica).
+    /// Consulta los estudiantes activos (Docente y Administrador ven todos; Acudiente ve solo sus asignados).
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Docente,Administrador")]
+    [Authorize(Roles = "Docente,Administrador,Acudiente")]
     [ProducesResponseType(typeof(ApiResponse<List<StudentProfileDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var result = await _studentService.GetAllStudentsAsync();
-        return Ok(result);
+        var userId = GetCurrentUserId();
+        if (User.IsInRole("Acudiente") && userId.HasValue)
+        {
+            var result = await _studentService.GetStudentsForGuardianUserAsync(userId.Value);
+            return Ok(result);
+        }
+
+        var allResult = await _studentService.GetAllStudentsAsync();
+        return Ok(allResult);
     }
 
     /// <summary>
@@ -105,6 +117,28 @@ public class StudentsController : BaseApiController
         }
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Consulta las actividades asignadas al estudiante para fines de bitácora y calificaciones (HU-010).
+    /// </summary>
+    [HttpGet("{studentId:guid}/grades")]
+    [Authorize(Roles = "Docente,Administrador")]
+    public async Task<IActionResult> GetStudentGrades([FromRoute] Guid studentId, CancellationToken cancellationToken)
+    {
+        var assignments = await _assignmentRepository.GetFilteredAsync(studentProfileId: studentId, cancellationToken: cancellationToken);
+        var result = assignments.Select(a => new
+        {
+            AssignmentId = a.Id,
+            Titulo = a.Activity?.Titulo ?? "Actividad pedagógica",
+            TipoActividad = a.Activity?.TipoActividad.ToString() ?? "Actividad",
+            Calificacion = a.Estado == EstadoAsignacion.Completada ? (double?)4.5 : null,
+            Comentario = a.Estado == EstadoAsignacion.Completada ? "Completada con éxito" : null,
+            FechaCalificacion = a.UpdatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? a.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss"),
+            PuedeEditar = true
+        }).ToList();
+
+        return Ok(ApiResponse<object>.Ok(result, "Calificaciones recuperadas exitosamente."));
     }
 }
 

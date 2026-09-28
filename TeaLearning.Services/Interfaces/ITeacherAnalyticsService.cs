@@ -10,6 +10,6 @@ public interface ITeacherAnalyticsService
         CancellationToken cancellationToken = default);
 
     Task<ApiResponse<TeacherClassroomSummaryDto>> GetClassroomAnalyticsSummaryAsync(
-        Guid classroomId, 
+        Guid? classroomId = null, 
         CancellationToken cancellationToken = default);
 }

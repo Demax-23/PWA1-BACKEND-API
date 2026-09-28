@@ -16,4 +16,17 @@ public interface IPedagogicalNoteService
         Guid currentUserId, 
         bool isStaff, 
         CancellationToken cancellationToken = default);
+
+    Task<ApiResponse<PedagogicalNoteDto>> UpdateNoteAsync(
+        Guid noteId,
+        Guid currentUserId,
+        bool isAdmin,
+        CreatePedagogicalNoteDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<ApiResponse<bool>> DeleteNoteAsync(
+        Guid noteId,
+        Guid currentUserId,
+        bool isAdmin,
+        CancellationToken cancellationToken = default);
 }

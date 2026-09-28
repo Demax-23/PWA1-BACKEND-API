@@ -103,4 +103,28 @@ public class StudentService : IStudentService
 
         return ApiResponse<List<StudentProfileDto>>.Ok(dtos, $"Se recuperaron {dtos.Count} estudiantes");
     }
+
+    public async Task<ApiResponse<List<StudentProfileDto>>> GetStudentsForGuardianUserAsync(
+        Guid guardianUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var allStudents = await _studentRepository.GetAllWithDetailsAsync(cancellationToken);
+        var guardianStudents = allStudents
+            .Where(s => s.GuardianProfile != null && s.GuardianProfile.UserId == guardianUserId)
+            .Select(studentProfile => new StudentProfileDto
+            {
+                Id = studentProfile.Id,
+                UserId = studentProfile.UserId,
+                NombreCompleto = studentProfile.User?.NombreCompleto ?? string.Empty,
+                CodigoEstudiante = studentProfile.CodigoEstudiante,
+                FechaNacimiento = studentProfile.FechaNacimiento,
+                ObservacionesMedicasTEA = studentProfile.ObservacionesMedicasTEA,
+                ClassroomId = studentProfile.ClassroomId,
+                ClassroomNombre = studentProfile.Classroom?.Nombre,
+                GuardianProfileId = studentProfile.GuardianProfileId,
+                GuardianNombre = studentProfile.GuardianProfile?.User?.NombreCompleto
+            }).ToList();
+
+        return ApiResponse<List<StudentProfileDto>>.Ok(guardianStudents, $"Se recuperaron {guardianStudents.Count} estudiantes para el acudiente");
+    }
 }

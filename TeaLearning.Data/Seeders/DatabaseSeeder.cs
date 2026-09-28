@@ -322,5 +322,51 @@ public static class DatabaseSeeder
             }
             await context.SaveChangesAsync();
         }
+
+        // 9. Sembrar Ejecuciones y Notas Pedagógicas de Demostración Inicial (Sprint 3)
+        if (studentProfile != null && !await context.ActivityExecutions.AnyAsync())
+        {
+            var existingAssignment = await context.ActivityAssignments.FirstOrDefaultAsync(a => a.StudentProfileId == studentProfile.Id);
+            if (existingAssignment != null)
+            {
+                var exec1 = new ActivityExecution
+                {
+                    AssignmentId = existingAssignment.Id,
+                    StudentProfileId = studentProfile.Id,
+                    TiempoRespuestaSegundos = 42,
+                    CantidadAciertos = 5,
+                    CantidadIntentosFallidos = 1,
+                    CompletadaExitosamente = true,
+                    FechaRegistro = DateTime.UtcNow.AddDays(-2)
+                };
+                var exec2 = new ActivityExecution
+                {
+                    AssignmentId = existingAssignment.Id,
+                    StudentProfileId = studentProfile.Id,
+                    TiempoRespuestaSegundos = 35,
+                    CantidadAciertos = 6,
+                    CantidadIntentosFallidos = 0,
+                    CompletadaExitosamente = true,
+                    FechaRegistro = DateTime.UtcNow
+                };
+                existingAssignment.Estado = EstadoAsignacion.Completada;
+                context.ActivityExecutions.AddRange(exec1, exec2);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        if (studentProfile != null && teacherProfile != null && !await context.PedagogicalNotes.AnyAsync())
+        {
+            var note = new PedagogicalNote
+            {
+                StudentProfileId = studentProfile.Id,
+                TeacherProfileId = teacherProfile.Id,
+                Contenido = "Mateo demostró un excelente avance en la identificación visual de emociones básicas. Mantuvo la atención durante toda la sesión y completó las secuencias con entusiasmo.",
+                FechaRegistro = DateTime.UtcNow.AddDays(-1),
+                IsActive = true
+            };
+            context.PedagogicalNotes.Add(note);
+            await context.SaveChangesAsync();
+        }
     }
 }

@@ -123,4 +123,69 @@ public class PedagogicalNoteService : IPedagogicalNoteService
 
         return ApiResponse<IReadOnlyList<PedagogicalNoteDto>>.Ok(dtoList, "Notas pedagógicas recuperadas exitosamente.");
     }
+
+    public async Task<ApiResponse<PedagogicalNoteDto>> UpdateNoteAsync(
+        Guid noteId,
+        Guid currentUserId,
+        bool isAdmin,
+        CreatePedagogicalNoteDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var note = await _noteRepository.GetWithDetailsAsync(noteId, cancellationToken);
+        if (note == null || !note.IsActive)
+        {
+            return ApiResponse<PedagogicalNoteDto>.Fail($"Observación pedagógica con ID {noteId} no encontrada.");
+        }
+
+        if (!isAdmin && note.TeacherProfile?.UserId != currentUserId)
+        {
+            return ApiResponse<PedagogicalNoteDto>.Fail("No tiene autorización para editar esta observación pedagógica.");
+        }
+
+        note.Contenido = dto.Contenido.Trim();
+        note.UpdatedAt = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
+        {
+            note.FechaRegistro = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+        }
+
+        await _noteRepository.UpdateAsync(note, cancellationToken);
+
+        var resultDto = new PedagogicalNoteDto
+        {
+            Id = note.Id,
+            StudentProfileId = note.StudentProfileId,
+            StudentNombre = note.StudentProfile?.User?.NombreCompleto ?? string.Empty,
+            TeacherProfileId = note.TeacherProfileId,
+            TeacherNombre = note.TeacherProfile?.User?.NombreCompleto ?? "Docente",
+            Contenido = note.Contenido,
+            FechaRegistro = note.FechaRegistro
+        };
+
+        return ApiResponse<PedagogicalNoteDto>.Ok(resultDto, "Observación pedagógica actualizada exitosamente.");
+    }
+
+    public async Task<ApiResponse<bool>> DeleteNoteAsync(
+        Guid noteId,
+        Guid currentUserId,
+        bool isAdmin,
+        CancellationToken cancellationToken = default)
+    {
+        var note = await _noteRepository.GetWithDetailsAsync(noteId, cancellationToken);
+        if (note == null || !note.IsActive)
+        {
+            return ApiResponse<bool>.Fail($"Observación pedagógica con ID {noteId} no encontrada.");
+        }
+
+        if (!isAdmin && note.TeacherProfile?.UserId != currentUserId)
+        {
+            return ApiResponse<bool>.Fail("No tiene autorización para eliminar esta observación pedagógica.");
+        }
+
+        note.IsActive = false;
+        note.UpdatedAt = DateTime.UtcNow;
+        await _noteRepository.UpdateAsync(note, cancellationToken);
+
+        return ApiResponse<bool>.Ok(true, "Observación pedagógica eliminada exitosamente.");
+    }
 }

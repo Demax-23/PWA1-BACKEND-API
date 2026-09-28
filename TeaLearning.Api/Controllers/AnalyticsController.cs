@@ -22,6 +22,7 @@ public class AnalyticsController : BaseApiController
     /// Incluye tasa de aciertos global, promedio de tiempo de respuesta por tipo de actividad, curva de intentos y evolución semanal.
     /// </summary>
     [HttpGet("teacher/students/{id:guid}/summary")]
+    [HttpGet("performance/students/{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<TeacherStudentSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<TeacherStudentSummaryDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStudentSummary([FromRoute] Guid id, CancellationToken cancellationToken)
@@ -40,9 +41,10 @@ public class AnalyticsController : BaseApiController
     /// Incluye tasa de aciertos promedio, tiempo de respuesta promedio y listado de rendimiento por estudiante.
     /// </summary>
     [HttpGet("teacher/classes/{classId:guid}")]
+    [HttpGet("performance/classroom")]
     [ProducesResponseType(typeof(ApiResponse<TeacherClassroomSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<TeacherClassroomSummaryDto>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetClassroomSummary([FromRoute] Guid classId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetClassroomSummary([FromRoute] Guid? classId, CancellationToken cancellationToken)
     {
         var result = await _analyticsService.GetClassroomAnalyticsSummaryAsync(classId, cancellationToken);
         if (!result.Success)

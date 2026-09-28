@@ -73,6 +73,24 @@ public class GuardianMonitoringService : IGuardianMonitoringService
             })
             .ToList();
 
+        var historico = executions
+            .GroupBy(e =>
+            {
+                var d = e.FechaRegistro.Date;
+                int diff = (7 + (d.DayOfWeek - DayOfWeek.Monday)) % 7;
+                return d.AddDays(-1 * diff).ToString("yyyy-MM-dd");
+            })
+            .OrderBy(g => g.Key)
+            .Select(g => new GuardianWeeklyProgressDto
+            {
+                Periodo = g.Key,
+                ActividadesCompletadas = g.Count(e => e.CompletadaExitosamente),
+                TasaAciertos = g.Sum(e => e.CantidadAciertos + e.CantidadIntentosFallidos) > 0
+                    ? Math.Round(100.0 * g.Sum(e => e.CantidadAciertos) / g.Sum(e => e.CantidadAciertos + e.CantidadIntentosFallidos), 1)
+                    : 100.0
+            })
+            .ToList();
+
         string nombreEstudiante = student.User?.Nombres ?? "El estudiante";
         string mensajePedagogico = GenerarMensajePedagogico(nombreEstudiante, porcentajeAvance, completadas);
 
@@ -88,10 +106,65 @@ public class GuardianMonitoringService : IGuardianMonitoringService
             PorcentajeAvance = porcentajeAvance,
             TiempoTotalInvertidoMinutos = minutosInvertidos,
             UltimasActividades = ultimasActividades,
+            Historico = historico,
             MensajePedagogico = mensajePedagogico
         };
 
         return ApiResponse<GuardianStudentProgressDto>.Ok(dto, "Progreso pedagógico del estudiante recuperado exitosamente.");
+    }
+
+    public async Task<ApiResponse<ActivityHistoryPagedDto>> GetActivityHistoryAsync(
+        Guid studentId,
+        Guid currentUserId,
+        bool isAdmin,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var student = await _studentRepository.GetStudentWithDetailsAsync(studentId, cancellationToken);
+        if (student == null)
+        {
+            return ApiResponse<ActivityHistoryPagedDto>.Fail($"Estudiante con ID {studentId} no encontrado.");
+        }
+
+        if (!isAdmin)
+        {
+            if (student.GuardianProfile == null || student.GuardianProfile.UserId != currentUserId)
+            {
+                return ApiResponse<ActivityHistoryPagedDto>.Fail("No tiene autorización para consultar el historial de este estudiante.");
+            }
+        }
+
+        var executions = await _executionRepository.GetByStudentIdWithActivityDetailsAsync(studentId, cancellationToken);
+        var ordered = executions.OrderByDescending(e => e.FechaRegistro).ToList();
+        int total = ordered.Count;
+        int safePage = Math.Max(1, page);
+        int safePageSize = Math.Max(1, pageSize);
+
+        var items = ordered
+            .Skip((safePage - 1) * safePageSize)
+            .Take(safePageSize)
+            .Select(e => new RecentActivityHistoryDto
+            {
+                Titulo = e.Assignment?.Activity?.Titulo ?? "Actividad pedagógica",
+                TipoActividad = e.Assignment?.Activity?.TipoActividad.ToString() ?? "Actividad",
+                FechaRegistro = e.FechaRegistro,
+                CompletadaExitosamente = e.CompletadaExitosamente,
+                CantidadAciertos = e.CantidadAciertos,
+                CantidadIntentosFallidos = e.CantidadIntentosFallidos,
+                TiempoRespuestaSegundos = e.TiempoRespuestaSegundos
+            })
+            .ToList();
+
+        var result = new ActivityHistoryPagedDto
+        {
+            Items = items,
+            Total = total,
+            Page = safePage,
+            PageSize = safePageSize
+        };
+
+        return ApiResponse<ActivityHistoryPagedDto>.Ok(result, "Historial de actividades recuperado exitosamente.");
     }
 
     private static string GenerarMensajePedagogico(string nombre, double porcentajeAvance, int completadas)

@@ -7,4 +7,12 @@ public class CreatePedagogicalNoteDto
     [Required(ErrorMessage = "El contenido de la observación pedagógica es obligatorio")]
     [MaxLength(2000, ErrorMessage = "La observación pedagógica no puede superar los 2000 caracteres")]
     public string Contenido { get; set; } = string.Empty;
+
+    public string? Titulo { get; set; }
+    public string? Tipo { get; set; }
+    public string? Area { get; set; }
+    public string? RecomendacionCasa { get; set; }
+    public bool? VisibleAcudiente { get; set; }
+    public string? Fecha { get; set; }
+    public Guid? AssignmentId { get; set; }
 }

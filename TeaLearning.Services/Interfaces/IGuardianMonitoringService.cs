@@ -10,4 +10,12 @@ public interface IGuardianMonitoringService
         Guid currentUserId, 
         bool isAdmin, 
         CancellationToken cancellationToken = default);
+
+    Task<ApiResponse<ActivityHistoryPagedDto>> GetActivityHistoryAsync(
+        Guid studentId,
+        Guid currentUserId,
+        bool isAdmin,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default);
 }

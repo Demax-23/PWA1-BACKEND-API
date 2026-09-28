@@ -16,4 +16,8 @@ public interface IStudentService
 
     Task<ApiResponse<List<StudentProfileDto>>> GetAllStudentsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<ApiResponse<List<StudentProfileDto>>> GetStudentsForGuardianUserAsync(
+        Guid guardianUserId,
+        CancellationToken cancellationToken = default);
 }
