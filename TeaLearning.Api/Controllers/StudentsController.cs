@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeaLearning.Services.Common;
+using TeaLearning.Services.DTOs.Achievements;
 using TeaLearning.Services.DTOs.Students;
 using TeaLearning.Services.Interfaces;
 
@@ -10,10 +11,14 @@ namespace TeaLearning.Api.Controllers;
 public class StudentsController : BaseApiController
 {
     private readonly IStudentService _studentService;
+    private readonly IAchievementService _achievementService;
 
-    public StudentsController(IStudentService studentService)
+    public StudentsController(
+        IStudentService studentService,
+        IAchievementService achievementService)
     {
         _studentService = studentService;
+        _achievementService = achievementService;
     }
 
     /// <summary>
@@ -76,4 +81,30 @@ public class StudentsController : BaseApiController
         var result = await _studentService.GetAllStudentsAsync();
         return Ok(result);
     }
+
+    /// <summary>
+    /// Consulta los logros, insignias personales y módulos concluidos del estudiante autenticado (HU-011).
+    /// </summary>
+    [HttpGet("me/achievements")]
+    [Authorize(Roles = "Estudiante")]
+    [ProducesResponseType(typeof(ApiResponse<StudentAchievementsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<StudentAchievementsDto>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<StudentAchievementsDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyAchievements(CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<StudentAchievementsDto>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        var result = await _achievementService.GetStudentAchievementsByUserIdAsync(userId.Value, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
 }
+

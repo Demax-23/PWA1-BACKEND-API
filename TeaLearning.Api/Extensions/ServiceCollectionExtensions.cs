@@ -76,6 +76,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILearningModuleRepository, LearningModuleRepository>();
         services.AddScoped<IActivityRepository, ActivityRepository>();
         services.AddScoped<IActivityExecutionRepository, ActivityExecutionRepository>();
+        services.AddScoped<IPedagogicalNoteRepository, PedagogicalNoteRepository>();
 
         // 5. Registro de Servicios de Lógica de Negocio
         services.AddScoped<IJwtService, JwtService>();
@@ -88,6 +89,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IActivityService, ActivityService>();
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<IActivityExecutionService, ActivityExecutionService>();
+        services.AddScoped<ITeacherAnalyticsService, TeacherAnalyticsService>();
+        services.AddScoped<IGuardianMonitoringService, GuardianMonitoringService>();
+        services.AddScoped<IPedagogicalNoteService, PedagogicalNoteService>();
+        services.AddScoped<IAchievementService, AchievementService>();
 
         // 6. Configuración de CORS
         services.AddCors(options =>

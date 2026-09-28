@@ -2,11 +2,11 @@
 
 Backend RESTful y persistencia en SQL Server para una plataforma de apoyo pedagógico orientada a estudiantes diagnosticados con **Autismo Nivel 1 (Trastorno del Espectro Autista - TEA)**.
 
-El sistema implementa interfaces accesibles con perfiles sensoriales personalizables, estructuración de rutinas predecibles y seguimiento pedagógico para docentes, acudientes y estudiantes.
+El sistema implementa interfaces accesibles con perfiles sensoriales personalizables, estructuración de rutinas predecibles, analítica cognitiva agregada y seguimiento pedagógico para docentes, acudientes y estudiantes.
 
 ---
 
-## 🚀 Estado del Proyecto: Sprints 1 y 2 Finalizados
+## 🚀 Estado del Proyecto: Sprints 1, 2 y 3 Finalizados
 
 | Requerimiento | Puntos | Descripción | Estado |
 |---|---|---|:---:|
@@ -17,6 +17,10 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 | **HU-005 - Asignación Individual y por Aula** | 3 pts | Asignación de actividades a un estudiante específico o en lote a un aula completa con fechas, prioridad y orden secuencial. | ✅ Completado |
 | **HU-006 - Ejecución Interactiva y Telemetría** | 8 pts | Flujo de inicio (`/start`) con entrega de adaptaciones sensoriales y registro de telemetría de desempeño (`/submit`). | ✅ Completado |
 | **HU-007 - Módulos Temáticos de Aprendizaje** | 3 pts | CRUD administrativo de categorías y módulos pedagógicos (`GET`, `POST`, `PUT`, `DELETE /api/modules`). | ✅ Completado |
+| **HU-008 - Panel Analítico del Docente** | 5 pts | Analítica cognitiva agregada: tasa de aciertos global, tiempos por tipo de actividad, curva de intentos y evolución semanal por estudiante y aula. | ✅ Completado |
+| **HU-009 - Monitoreo del Acudiente** | 5 pts | Consolidado de avance pedagógico para familias: actividades completadas vs pendientes, tiempo invertido y mensaje empático. | ✅ Completado |
+| **HU-010 - Bitácora Pedagógica Docente** | 3 pts | Registro cualitativo de observaciones docentes (`POST`, `GET /api/students/{id}/pedagogical-notes`) accesible para docentes y acudientes. | ✅ Completado |
+| **HU-011 - Logros e Insignias del Estudiante** | 3 pts | Gamificación no competitiva y positiva adaptada a TEA: insignias personales calculadas dinámicamente y módulos completados (`/api/students/me/achievements`). | ✅ Completado |
 
 ---
 
@@ -36,21 +40,21 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 ```text
 TeaLearningSystem/
 ├── TeaLearning.Api/           # Capa de Entrada / Controladores RESTful
-│   ├── Controllers/           # Auth, Users, Students, SensoryPreferences, Modules, Activities, Assignments
+│   ├── Controllers/           # Auth, Users, Students, SensoryPreferences, Modules, Activities, Assignments, Analytics, Guardian, PedagogicalNotes
 │   ├── Middlewares/           # ExceptionHandlingMiddleware (ProblemDetails / ApiResponse unificado)
 │   ├── Extensions/            # Inyección de dependencias (DI), Swagger, JWT, Identity y CORS
 │   └── Program.cs             # Pipeline HTTP y punto de entrada de la aplicación
 │
 ├── TeaLearning.Services/      # Capa de Lógica de Negocio
 │   ├── Common/                # ApiResponse<T> unificado
-│   ├── DTOs/                  # DTOs de Auth, Users, Students, Sensory, Modules, Activities, Assignments, Execution
-│   ├── Interfaces/            # IAuthService, IUserService, IModuleService, IActivityService, IAssignmentService, etc.
-│   └── Services/              # Implementaciones de lógica pedagógica, validación JSON y telemetría
+│   ├── DTOs/                  # DTOs de Auth, Users, Students, Sensory, Modules, Activities, Assignments, Execution, Analytics, Guardian, Pedagogical, Achievements
+│   ├── Interfaces/            # IAuthService, IUserService, IModuleService, IActivityService, IAssignmentService, ITeacherAnalyticsService, etc.
+│   └── Services/              # Implementaciones de lógica pedagógica, validación JSON, telemetría y analítica cognitiva
 │
 ├── TeaLearning.Data/          # Capa de Persistencia y Acceso a Datos
 │   ├── Context/               # ApplicationDbContext con Identity y DbSets de dominio
 │   ├── Configurations/        # Mapeos Fluent API para entidades y relaciones sin ciclos de cascada
-│   ├── Repositorios/          # Repositorios genéricos y especializados
+│   ├── Repositorios/          # Repositorios genéricos y especializados (Student, Activity, Execution, PedagogicalNote, etc.)
 │   ├── Migrations/            # Historial de migraciones de EF Core
 │   └── Seeders/               # DatabaseSeeder para inicialización automática
 │
@@ -114,12 +118,12 @@ dotnet run --project TeaLearning.Api --launch-profile http
 |---|---|---|---|
 | **Administrador** | `admin@tealearning.com` | `Admin123!*` | Administrador del Sistema |
 | **Docente** | `docente@tealearning.com` | `Docente123!*` | `TeacherProfile` y `Classroom` ("Aula Azul") |
-| **Acudiente** | `acudiente@tealearning.com` | `Acudiente123!*` | `GuardianProfile` con relación al estudiante |
+| **Acudiente** | `acudiente@tealearning.com` | `Acudiente123!*` | `GuardianProfile` con relación a Mateo Pérez |
 | **Estudiante** | `estudiante@tealearning.com` | `Estudiante123!*` | `StudentProfile` (`EST-TEA-001`) + `SensoryPreference` |
 
 ---
 
-## 🔌 Catálogo Completo de Endpoints (Sprints 1 y 2)
+## 🔌 Catálogo Completo de Endpoints (Sprints 1, 2 y 3)
 
 ### 1. Autenticación (`/api/auth`)
 * `POST /api/auth/login`: Autentica credenciales y emite JWT + Refresh Token.
@@ -131,9 +135,11 @@ dotnet run --project TeaLearning.Api --launch-profile http
 * `GET /api/users/{id}`: Detalle de usuario *(Rol: Administrador)*.
 * `PUT /api/users/{id}/roles`: Actualiza roles RBAC *(Rol: Administrador)*.
 
-### 3. Rutina Visual Diaria (`/api/students`)
+### 3. Rutina Visual Diaria y Perfil (`/api/students`)
 * `GET /api/students/me/daily-routine`: Actividades del estudiante para hoy ordenadas pedagógicamente *(Rol: Estudiante)*.
 * `GET /api/students/me/profile`: Perfil del estudiante autenticado *(Rol: Estudiante)*.
+* `GET /api/students`: Consulta todos los estudiantes activos *(Rol: Docente o Administrador)*.
+* `GET /api/students/me/achievements`: Logros, insignias personales y módulos concluidos (*HU-011*, *Rol: Estudiante*).
 
 ### 4. Configuración Sensorial Adaptativa (`/api/students/{id}/sensory-preferences`)
 * `GET /api/students/{id}/sensory-preferences`: Consulta paleta, tipografía, contraste y escala *(Rol: Acudiente o Administrador)*.
@@ -161,11 +167,21 @@ dotnet run --project TeaLearning.Api --launch-profile http
 * `GET /api/assignments/{id}`: Detalle de la asignación.
 * `DELETE /api/assignments/{id}`: Cancelar o eliminar asignación *(Rol: Docente o Administrador)*.
 
+### 8. Panel Analítico Docente (`/api/analytics`) - *HU-008*
+* `GET /api/analytics/teacher/students/{id}/summary`: Analítica individual por estudiante (tasa aciertos global, tiempos por tipo de actividad, curva de intentos y evolución semanal) *(Rol: Docente o Administrador)*.
+* `GET /api/analytics/teacher/classes/{classId}`: Analítica consolidada por aula con listado comparativo de desempeño de estudiantes *(Rol: Docente o Administrador)*.
+
+### 9. Monitoreo para el Acudiente (`/api/guardian`) - *HU-009*
+* `GET /api/guardian/students/{studentId}/progress`: Resumen de avance, tiempo total invertido, historial de ejecuciones y mensaje pedagógico empático *(Rol: Acudiente autorizado o Administrador)*.
+
+### 10. Bitácora Pedagógica (`/api/students/{id}/pedagogical-notes`) - *HU-010*
+* `POST /api/students/{id}/pedagogical-notes`: Registro de observación cualitativa sobre el estudiante *(Rol: Docente o Administrador)*.
+* `GET /api/students/{id}/pedagogical-notes`: Consulta cronológica de notas cualitativas de la bitácora *(Rol: Docente, Administrador o Acudiente del estudiante)*.
+
 ---
 
-## 📌 Próximo Alcance: Sprint 3 (Analítica Cognitiva y Seguimiento)
+## 📌 Próximo Alcance: Sprint 4 (Hardening, Observaciones del Acudiente y Cierre)
 
-* **HU-008:** Panel Analítico del Docente con métricas agregadas por estudiante y por aula (`/api/analytics/teacher/...`).
-* **HU-009:** Monitoreo del Acudiente con progreso, tiempo invertido y evolución (`/api/guardian/...`).
-* **HU-010:** Bitácora Pedagógica (CRUD de notas cualitativas docentes) (`/api/students/{id}/pedagogical-notes`).
-* **HU-011:** Visualización de Logros No Competitivos del Estudiante (`/api/students/me/achievements`).
+* **HU-012:** Registro y consulta de observaciones del acudiente hacia el equipo docente (`/api/guardian/observations`).
+* Optimización de rendimiento con índices compuestos en `ActivityAssignments` y `ActivityExecutions`.
+* Verificación integral de respuestas `ProblemDetails` según RFC 7807 y revisión general de seguridad.
