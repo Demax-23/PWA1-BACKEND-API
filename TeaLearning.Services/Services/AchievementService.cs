@@ -62,6 +62,7 @@ public class AchievementService : IAchievementService
         var assignments = await _assignmentRepository.GetFilteredAsync(studentProfileId: student.Id, cancellationToken: cancellationToken);
 
         var modules = await _context.LearningModules
+            .Include(m => m.Categoria)
             .Include(m => m.Activities.Where(a => a.IsActive))
             .Where(m => m.IsActive)
             .OrderBy(m => m.Orden)
@@ -143,32 +144,99 @@ public class AchievementService : IAchievementService
             }
         };
 
-        // 2. Módulos completados (un módulo está completado si todas sus actividades activas tienen al menos una asignación completada)
+        // 2. Módulos y progreso (HU-011: camino de aprendizaje no competitivo)
         var modulosConcluidos = new List<CompletedModuleDto>();
+        var modulosProgreso = new List<StudentModuleProgressDto>();
         var completedActivityIds = assignments
-            .Where(a => a.Estado == EstadoAsignacion.Completada)
+            .Where(a => a.Estado == EstadoAsignacion.Completada || executions.Any(e => e.AssignmentId == a.Id && e.CompletadaExitosamente))
             .Select(a => a.ActivityId)
             .ToHashSet();
 
         foreach (var mod in modules)
         {
-            if (mod.Activities.Any() && mod.Activities.All(a => completedActivityIds.Contains(a.Id)))
-            {
-                var lastExecutionDate = executions
-                    .Where(e => e.CompletadaExitosamente && mod.Activities.Any(act => act.Id == e.Assignment?.ActivityId))
-                    .OrderByDescending(e => e.FechaRegistro)
-                    .Select(e => (DateTime?)e.FechaRegistro)
-                    .FirstOrDefault();
+            int totalActs = mod.Activities.Count;
+            int completedActs = mod.Activities.Count(a => completedActivityIds.Contains(a.Id));
+            bool isCompleted = totalActs > 0 && completedActs >= totalActs;
 
+            var lastExecDate = executions
+                .Where(e => e.CompletadaExitosamente && mod.Activities.Any(act => act.Id == e.Assignment?.ActivityId))
+                .OrderByDescending(e => e.FechaRegistro)
+                .Select(e => (DateTime?)e.FechaRegistro)
+                .FirstOrDefault();
+
+            if (isCompleted)
+            {
                 modulosConcluidos.Add(new CompletedModuleDto
                 {
                     ModuloId = mod.Id,
                     Titulo = mod.Titulo,
-                    TotalActividades = mod.Activities.Count,
-                    FechaConclusion = lastExecutionDate ?? DateTime.UtcNow
+                    TotalActividades = totalActs,
+                    FechaConclusion = lastExecDate ?? DateTime.UtcNow
+                });
+            }
+
+            modulosProgreso.Add(new StudentModuleProgressDto
+            {
+                ModuloId = mod.Id,
+                Titulo = mod.Titulo,
+                Categoria = mod.Categoria?.Nombre ?? "General",
+                Orden = mod.Orden,
+                ActividadesTotales = totalActs,
+                ActividadesCompletadas = completedActs,
+                Completado = isCompleted,
+                FechaCompletado = isCompleted ? (lastExecDate?.ToString("yyyy-MM-dd") ?? DateTime.UtcNow.ToString("yyyy-MM-dd")) : null
+            });
+        }
+
+        // 3. Logros e hitos del estudiante (HU-011: gamificación personal sin elementos competitivos)
+        var logros = new List<StudentMilestoneDto>();
+
+        if (primerExito != null)
+        {
+            logros.Add(new StudentMilestoneDto
+            {
+                Id = $"primer_paso_{primerExito.Id}",
+                Tipo = "PrimeraActividad",
+                Descripcion = "Terminaste tu primera actividad en la plataforma.",
+                Fecha = primerExito.FechaRegistro.ToString("yyyy-MM-ddTHH:mm:ss")
+            });
+        }
+
+        var completedDistinctActivities = exitos
+            .Where(e => e.Assignment?.Activity != null)
+            .GroupBy(e => e.Assignment!.ActivityId)
+            .Select(g => g.OrderByDescending(e => e.FechaRegistro).First())
+            .ToList();
+
+        foreach (var actExec in completedDistinctActivities)
+        {
+            var actTitle = actExec.Assignment?.Activity?.Titulo;
+            if (!string.IsNullOrWhiteSpace(actTitle))
+            {
+                logros.Add(new StudentMilestoneDto
+                {
+                    Id = $"act_{actExec.Id}",
+                    Tipo = "ActividadCompletada",
+                    Descripcion = $"Terminaste la actividad \"{actTitle}\".",
+                    Fecha = actExec.FechaRegistro.ToString("yyyy-MM-ddTHH:mm:ss")
                 });
             }
         }
+
+        foreach (var mod in modulosProgreso.Where(m => m.Completado))
+        {
+            logros.Add(new StudentMilestoneDto
+            {
+                Id = $"mod_{mod.ModuloId}",
+                Tipo = "ModuloCompletado",
+                Descripcion = $"Terminaste el módulo \"{mod.Titulo}\".",
+                Fecha = !string.IsNullOrWhiteSpace(mod.FechaCompletado) 
+                    ? $"{mod.FechaCompletado}T23:59:59" 
+                    : DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss")
+            });
+        }
+
+        logros = logros.OrderByDescending(l => l.Fecha).ToList();
 
         string nombreEstudiante = student.User?.Nombres ?? "Estudiante";
         int totalCompletadas = exitos.Count;
@@ -188,7 +256,9 @@ public class AchievementService : IAchievementService
             TotalModulosConcluidos = modulosConcluidos.Count,
             Insignias = insignias,
             ModulosConcluidos = modulosConcluidos,
-            MensajeMotivacional = mensajeMotivacional
+            MensajeMotivacional = mensajeMotivacional,
+            Modulos = modulosProgreso,
+            Logros = logros
         };
 
         return ApiResponse<StudentAchievementsDto>.Ok(dto, "Logros e insignias del estudiante recuperados exitosamente.");
