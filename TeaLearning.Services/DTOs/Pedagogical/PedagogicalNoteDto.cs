@@ -11,9 +11,12 @@ public class PedagogicalNoteDto
     public string Contenido { get; set; } = string.Empty;
     public DateTime FechaRegistro { get; set; }
     public string Fecha => FechaRegistro.ToString("yyyy-MM-dd");
-    public string Titulo => !string.IsNullOrEmpty(Contenido) && Contenido.Length > 40 ? Contenido.Substring(0, 40) + "..." : (Contenido ?? "Observación");
-    public string Tipo => "Observacion";
-    public string Area => "Socioemocional";
-    public bool VisibleAcudiente => true;
-    public bool PuedeEditar => true;
+
+    public string Titulo { get; set; } = string.Empty;
+    public string Tipo { get; set; } = "Observacion";
+    public string Area { get; set; } = "Socioemocional";
+    public string? RecomendacionCasa { get; set; }
+    public bool VisibleAcudiente { get; set; } = true;
+    public Guid? AssignmentId { get; set; }
+    public bool PuedeEditar { get; set; } = true;
 }

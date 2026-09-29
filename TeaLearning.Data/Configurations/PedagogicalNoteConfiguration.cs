@@ -27,5 +27,23 @@ public class PedagogicalNoteConfiguration : IEntityTypeConfiguration<Pedagogical
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(pn => new { pn.StudentProfileId, pn.FechaRegistro });
+
+        builder.Property(pn => pn.Titulo)
+            .HasMaxLength(100)
+            .HasDefaultValue(string.Empty);
+
+        builder.Property(pn => pn.Tipo)
+            .HasMaxLength(30)
+            .HasDefaultValue("Observacion");
+
+        builder.Property(pn => pn.Area)
+            .HasMaxLength(30)
+            .HasDefaultValue("Socioemocional");
+
+        builder.Property(pn => pn.RecomendacionCasa)
+            .HasMaxLength(500);
+
+        builder.Property(pn => pn.VisibleAcudiente)
+            .HasDefaultValue(true);
     }
 }

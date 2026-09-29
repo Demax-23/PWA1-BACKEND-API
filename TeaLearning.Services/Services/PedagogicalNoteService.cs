@@ -68,8 +68,19 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             TeacherProfileId = teacherProfile.Id,
             Contenido = dto.Contenido.Trim(),
             FechaRegistro = DateTime.UtcNow,
+            Titulo = dto.Titulo?.Trim() ?? string.Empty,
+            Tipo = dto.Tipo ?? "Observacion",
+            Area = dto.Area ?? "Socioemocional",
+            RecomendacionCasa = dto.RecomendacionCasa?.Trim(),
+            VisibleAcudiente = dto.VisibleAcudiente ?? true,
+            AssignmentId = dto.AssignmentId,
             IsActive = true
         };
+
+        if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
+        {
+            note.FechaRegistro = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+        }
 
         await _noteRepository.AddAsync(note, cancellationToken);
 
@@ -81,7 +92,13 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             TeacherProfileId = note.TeacherProfileId,
             TeacherNombre = teacherProfile.User?.NombreCompleto ?? string.Empty,
             Contenido = note.Contenido,
-            FechaRegistro = note.FechaRegistro
+            FechaRegistro = note.FechaRegistro,
+            Titulo = note.Titulo,
+            Tipo = note.Tipo,
+            Area = note.Area,
+            RecomendacionCasa = note.RecomendacionCasa,
+            VisibleAcudiente = note.VisibleAcudiente,
+            AssignmentId = note.AssignmentId
         };
 
         return ApiResponse<PedagogicalNoteDto>.Ok(resultDto, "Nota pedagógica registrada exitosamente.");
@@ -118,7 +135,13 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             TeacherProfileId = n.TeacherProfileId,
             TeacherNombre = n.TeacherProfile?.User?.NombreCompleto ?? "Docente",
             Contenido = n.Contenido,
-            FechaRegistro = n.FechaRegistro
+            FechaRegistro = n.FechaRegistro,
+            Titulo = n.Titulo,
+            Tipo = n.Tipo,
+            Area = n.Area,
+            RecomendacionCasa = n.RecomendacionCasa,
+            VisibleAcudiente = n.VisibleAcudiente,
+            AssignmentId = n.AssignmentId
         }).ToList();
 
         return ApiResponse<IReadOnlyList<PedagogicalNoteDto>>.Ok(dtoList, "Notas pedagógicas recuperadas exitosamente.");
@@ -143,6 +166,12 @@ public class PedagogicalNoteService : IPedagogicalNoteService
         }
 
         note.Contenido = dto.Contenido.Trim();
+        note.Titulo = dto.Titulo?.Trim() ?? string.Empty;
+        note.Tipo = dto.Tipo ?? note.Tipo;
+        note.Area = dto.Area ?? note.Area;
+        note.RecomendacionCasa = dto.RecomendacionCasa?.Trim();
+        note.VisibleAcudiente = dto.VisibleAcudiente ?? note.VisibleAcudiente;
+        note.AssignmentId = dto.AssignmentId;
         note.UpdatedAt = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
         {
@@ -159,7 +188,13 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             TeacherProfileId = note.TeacherProfileId,
             TeacherNombre = note.TeacherProfile?.User?.NombreCompleto ?? "Docente",
             Contenido = note.Contenido,
-            FechaRegistro = note.FechaRegistro
+            FechaRegistro = note.FechaRegistro,
+            Titulo = note.Titulo,
+            Tipo = note.Tipo,
+            Area = note.Area,
+            RecomendacionCasa = note.RecomendacionCasa,
+            VisibleAcudiente = note.VisibleAcudiente,
+            AssignmentId = note.AssignmentId
         };
 
         return ApiResponse<PedagogicalNoteDto>.Ok(resultDto, "Observación pedagógica actualizada exitosamente.");
