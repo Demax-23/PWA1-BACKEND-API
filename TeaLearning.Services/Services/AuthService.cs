@@ -85,6 +85,15 @@ public class AuthService : IAuthService
         // 5. Crear el perfil de rol correspondiente
         if (matchedRole == "Estudiante")
         {
+            // Si no se proporcionó un aula, asignar la primera aula activa por defecto
+            var classroomId = dto.ClassroomId;
+            if (!classroomId.HasValue)
+            {
+                var defaultClassroom = await _context.Classrooms
+                    .FirstOrDefaultAsync(c => c.IsActive);
+                classroomId = defaultClassroom?.Id;
+            }
+
             var studentProfile = new StudentProfile
             {
                 UserId = user.Id,
@@ -92,7 +101,7 @@ public class AuthService : IAuthService
                     ? dto.CodigoEstudiante 
                     : $"EST-{DateTime.UtcNow.Ticks % 100000:D5}",
                 FechaNacimiento = dto.FechaNacimiento ?? DateTime.UtcNow.AddYears(-10),
-                ClassroomId = dto.ClassroomId,
+                ClassroomId = classroomId,
                 GuardianProfileId = dto.GuardianProfileId
             };
             _context.StudentProfiles.Add(studentProfile);

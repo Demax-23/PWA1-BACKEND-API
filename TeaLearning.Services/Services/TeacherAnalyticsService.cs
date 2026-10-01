@@ -156,6 +156,14 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
 
         var executions = await _executionRepository.GetByClassroomIdWithDetailsAsync(classroom.Id, cancellationToken);
 
+        // Incluir también estudiantes activos sin aula asignada
+        var studentsWithoutClassroom = await _context.StudentProfiles
+            .Include(s => s.User)
+            .Where(s => s.IsActive && s.ClassroomId == null)
+            .ToListAsync(cancellationToken);
+
+        var allStudents = classroom.Students.Concat(studentsWithoutClassroom).ToList();
+
         int totalAciertos = executions.Sum(e => e.CantidadAciertos);
         int totalFallos = executions.Sum(e => e.CantidadIntentosFallidos);
         int totalRespuestas = totalAciertos + totalFallos;
@@ -168,9 +176,9 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             ? Math.Round(executions.Average(e => e.TiempoRespuestaSegundos), 1) 
             : 0.0;
 
-        // Desempeño individual de cada estudiante en el aula
+        // Desempeño individual de cada estudiante (incluyendo los sin aula)
         var desempenoEstudiantes = new List<StudentClassPerformanceDto>();
-        foreach (var student in classroom.Students)
+        foreach (var student in allStudents)
         {
             var studentExecutions = executions.Where(e => e.StudentProfileId == student.Id).ToList();
             int stAciertos = studentExecutions.Sum(x => x.CantidadAciertos);
@@ -213,7 +221,7 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             ClassroomId = classroom.Id,
             ClassroomNombre = classroom.Nombre,
             Grado = classroom.Grado,
-            TotalEstudiantes = classroom.Students.Count,
+            TotalEstudiantes = allStudents.Count,
             TasaAciertosPromedioAula = tasaAciertosAula,
             PromedioTiempoRespuestaAula = promedioTiempoAula,
             TotalActividadesCompletadasAula = executions.Count(e => e.CompletadaExitosamente),

@@ -47,7 +47,7 @@ public class ActivityExecutionRepository : GenericRepository<ActivityExecution>,
             .Include(e => e.Assignment)
                 .ThenInclude(a => a.Activity)
                     .ThenInclude(act => act.Modulo)
-            .Where(e => e.StudentProfile.ClassroomId == classroomId && e.IsActive)
+            .Where(e => (e.StudentProfile.ClassroomId == classroomId || e.StudentProfile.ClassroomId == null) && e.IsActive)
             .OrderBy(e => e.FechaRegistro)
             .ToListAsync(cancellationToken);
     }

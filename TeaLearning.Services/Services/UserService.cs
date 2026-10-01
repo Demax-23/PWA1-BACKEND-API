@@ -198,6 +198,22 @@ public class UserService : IUserService
         {
             user.Apellidos = dto.Apellidos.Trim();
         }
+        if (!string.IsNullOrWhiteSpace(dto.Email))
+        {
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+            if (!string.Equals(user.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                var existing = await _userManager.FindByEmailAsync(normalizedEmail);
+                if (existing != null && existing.Id != id)
+                {
+                    return ApiResponse<UserDto>.Fail("Ya existe un usuario registrado con ese correo electrónico.");
+                }
+                user.Email = normalizedEmail;
+                user.NormalizedEmail = _userManager.NormalizeEmail(normalizedEmail);
+                user.UserName = normalizedEmail;
+                user.NormalizedUserName = _userManager.NormalizeName(normalizedEmail);
+            }
+        }
         if (dto.IsActive.HasValue)
         {
             user.IsActive = dto.IsActive.Value;
