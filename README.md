@@ -2,11 +2,11 @@
 
 Backend RESTful y persistencia en SQL Server para una plataforma de apoyo pedagógico orientada a estudiantes diagnosticados con **Autismo Nivel 1 (Trastorno del Espectro Autista - TEA)**.
 
-El sistema implementa interfaces accesibles con perfiles sensoriales personalizables, estructuración de rutinas predecibles, analítica cognitiva agregada y seguimiento pedagógico para docentes, acudientes y estudiantes.
+El sistema implementa interfaces accesibles con perfiles sensoriales personalizables, estructuración de rutinas predecibles, analítica cognitiva agregada, seguimiento pedagógico para docentes, acudientes y estudiantes, hardening de seguridad y optimización para alta disponibilidad.
 
 ---
 
-## 🚀 Estado del Proyecto: Sprints 1, 2 y 3 Finalizados
+## 🚀 Estado del Proyecto: Sprints 1, 2, 3 y 4 Finalizados (100% Completado)
 
 | Requerimiento | Puntos | Descripción | Estado |
 |---|---|---|:---:|
@@ -21,6 +21,10 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 | **HU-009 - Monitoreo del Acudiente** | 5 pts | Consolidado de avance pedagógico para familias: actividades completadas vs pendientes, tiempo invertido y mensaje empático. | ✅ Completado |
 | **HU-010 - Bitácora Pedagógica Docente** | 3 pts | Registro cualitativo de observaciones docentes (`POST`, `GET /api/students/{id}/pedagogical-notes`) accesible para docentes y acudientes. | ✅ Completado |
 | **HU-011 - Logros e Insignias del Estudiante** | 3 pts | Gamificación no competitiva y positiva adaptada a TEA: insignias personales calculadas dinámicamente y módulos completados (`/api/students/me/achievements`). | ✅ Completado |
+| **HU-012 - Observaciones Paginadas para Familias** | 2 pts | Consulta cronológica de observaciones docentes con soporte de paginación (`GET /api/guardian/students/{id}/observations`) y filtro de visibilidad. | ✅ Completado |
+| **Hardening de Seguridad & Admin Protection** | — | Prevención de auto-eliminación, auto-desactivación y auto-democión del rol `Administrador`. | ✅ Completado |
+| **Optimización de Base de Datos** | — | Índices compuestos en `ActivityAssignments`, `ActivityExecutions` y `PedagogicalNotes` en SQL Server. | ✅ Completado |
+| **Manejo Global RFC 7807 (ProblemDetails)** | — | Middleware de excepciones con encabezado `application/problem+json` y propiedades estándar RFC 7807. | ✅ Completado |
 
 ---
 
@@ -30,7 +34,7 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 * **Framework Web:** ASP.NET Core Web API
 * **Persistencia & ORM:** Entity Framework Core 9 (Code First)
 * **Base de Datos:** Microsoft SQL Server (LocalDB / SQL Server Express / Developer)
-* **Seguridad & Auth:** ASP.NET Core Identity (`IdentityDbContext`) con autenticación basada en tokens JWT (`JwtBearer`) y Claims estructurados.
+* **Seguridad & Auth:** ASP.NET Core Identity (`IdentityDbContext`) con hashing de contraseñas mediante **BCrypt** (`BCrypt.Net-Next`, factor de trabajo 11) en reemplazo del algoritmo predeterminado PBKDF2/SHA-256, autenticación basada en tokens JWT (`JwtBearer`) y Claims estructurados.
 * **Documentación Interactiva:** Swagger / OpenAPI (`Swashbuckle.AspNetCore`) con soporte para autorización Bearer Token.
 
 ---
@@ -41,35 +45,40 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 TeaLearningSystem/
 ├── TeaLearning.Api/           # Capa de Entrada / Controladores RESTful
 │   ├── Controllers/           # Auth, Users, Students, SensoryPreferences, Modules, Activities, Assignments, Analytics, Guardian, PedagogicalNotes
-│   ├── Middlewares/           # ExceptionHandlingMiddleware (ProblemDetails / ApiResponse unificado)
+│   ├── Middlewares/           # ExceptionHandlingMiddleware (RFC 7807 ProblemDetails / ApiResponse unificado)
 │   ├── Extensions/            # Inyección de dependencias (DI), Swagger, JWT, Identity y CORS
 │   └── Program.cs             # Pipeline HTTP y punto de entrada de la aplicación
 │
 ├── TeaLearning.Services/      # Capa de Lógica de Negocio
 │   ├── Common/                # ApiResponse<T> unificado
 │   ├── DTOs/                  # DTOs de Auth, Users, Students, Sensory, Modules, Activities, Assignments, Execution, Analytics, Guardian, Pedagogical, Achievements
-│   ├── Interfaces/            # IAuthService, IUserService, IModuleService, IActivityService, IAssignmentService, ITeacherAnalyticsService, etc.
+│   ├── Interfaces/            # IAuthService, IUserService, IModuleService, IActivityService, IAssignmentService, ITeacherAnalyticsService, IPedagogicalNoteService, etc.
+│   ├── Security/              # BcryptPasswordHasher (IPasswordHasher<ApplicationUser> con BCrypt.Net)
 │   └── Services/              # Implementaciones de lógica pedagógica, validación JSON, telemetría y analítica cognitiva
 │
 ├── TeaLearning.Data/          # Capa de Persistencia y Acceso a Datos
 │   ├── Context/               # ApplicationDbContext con Identity y DbSets de dominio
-│   ├── Configurations/        # Mapeos Fluent API para entidades y relaciones sin ciclos de cascada
+│   ├── Configurations/        # Mapeos Fluent API con índices compuestos y relaciones sin ciclos de cascada
 │   ├── Repositorios/          # Repositorios genéricos y especializados (Student, Activity, Execution, PedagogicalNote, etc.)
 │   ├── Migrations/            # Historial de migraciones de EF Core
 │   └── Seeders/               # DatabaseSeeder para inicialización automática
 │
-└── TeaLearning.Core/          # Capa de Dominio (Modelos Puros)
-    ├── Common/                # BaseEntity (Id, CreatedAt, UpdatedAt, IsActive)
-    ├── Entities/              # Entidades del dominio completo
-    └── Enums/                 # UserRole, ModoContraste, TipoActividad, EstadoAsignacion, PrioridadActividad
+├── TeaLearning.Core/          # Capa de Dominio (Modelos Puros)
+│   ├── Common/                # BaseEntity (Id, CreatedAt, UpdatedAt, IsActive)
+│   ├── Entities/              # Entidades del dominio completo
+│   └── Enums/                 # UserRole, ModoContraste, TipoActividad, EstadoAsignacion, PrioridadActividad
+│
+└── TeaLearning.Tests/         # Pruebas Unitarias e Integración
+    ├── BcryptPasswordHasherTests.cs
+    ├── IdentityBcryptIntegrationTests.cs
+    └── ExceptionHandlingMiddlewareTests.cs
 ```
 
 ---
 
 ## 📋 Estructura de Respuestas de la API
 
-Todas las respuestas del sistema siguen el formato estandarizado:
-
+### Respuestas Exitosas y Operacionales
 ```json
 {
   "success": true,
@@ -79,12 +88,27 @@ Todas las respuestas del sistema siguen el formato estandarizado:
 }
 ```
 
+### Respuestas de Error No Controlado (RFC 7807 ProblemDetails)
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+  "title": "An error occurred while processing your request.",
+  "status": 500,
+  "detail": "Ha ocurrido un error inesperado al procesar la solicitud.",
+  "instance": "/api/...",
+  "traceId": "0HN123...",
+  "success": false,
+  "message": "Ha ocurrido un error inesperado al procesar la solicitud.",
+  "errors": [ ... ]
+}
+```
+
 ---
 
 ## ⚙️ Configuración y Ejecución Local
 
 ### Prerrequisitos
-* [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (o .NET 10 compatible)
+* [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 * SQL Server con LocalDB instalado (`(localdb)\mssqllocaldb`)
 * Herramienta CLI de Entity Framework Core:
   ```bash
@@ -123,7 +147,7 @@ dotnet run --project TeaLearning.Api --launch-profile http
 
 ---
 
-## 🔌 Catálogo Completo de Endpoints (Sprints 1, 2 y 3)
+## 🔌 Catálogo Completo de Endpoints (Sprints 1, 2, 3 y 4)
 
 ### 1. Autenticación (`/api/auth`)
 * `POST /api/auth/login`: Autentica credenciales y emite JWT + Refresh Token.
@@ -133,7 +157,9 @@ dotnet run --project TeaLearning.Api --launch-profile http
 ### 2. Gestión de Usuarios y Roles (`/api/users`)
 * `GET /api/users`: Lista usuarios con sus roles y perfiles *(Rol: Administrador)*.
 * `GET /api/users/{id}`: Detalle de usuario *(Rol: Administrador)*.
-* `PUT /api/users/{id}/roles`: Actualiza roles RBAC *(Rol: Administrador)*.
+* `PUT /api/users/{id}/roles`: Actualiza roles RBAC con protección contra auto-democión *(Rol: Administrador)*.
+* `PUT /api/users/{id}`: Actualiza datos y estado con protección contra auto-desactivación *(Rol: Administrador)*.
+* `DELETE /api/users/{id}`: Elimina permanentemente usuario con protección contra auto-eliminación *(Rol: Administrador)*.
 
 ### 3. Rutina Visual Diaria y Perfil (`/api/students`)
 * `GET /api/students/me/daily-routine`: Actividades del estudiante para hoy ordenadas pedagógicamente *(Rol: Estudiante)*.
@@ -171,17 +197,13 @@ dotnet run --project TeaLearning.Api --launch-profile http
 * `GET /api/analytics/teacher/students/{id}/summary`: Analítica individual por estudiante (tasa aciertos global, tiempos por tipo de actividad, curva de intentos y evolución semanal) *(Rol: Docente o Administrador)*.
 * `GET /api/analytics/teacher/classes/{classId}`: Analítica consolidada por aula con listado comparativo de desempeño de estudiantes *(Rol: Docente o Administrador)*.
 
-### 9. Monitoreo para el Acudiente (`/api/guardian`) - *HU-009*
+### 9. Monitoreo para el Acudiente (`/api/guardian`) - *HU-009 & HU-012*
 * `GET /api/guardian/students/{studentId}/progress`: Resumen de avance, tiempo total invertido, historial de ejecuciones y mensaje pedagógico empático *(Rol: Acudiente autorizado o Administrador)*.
+* `GET /api/guardian/students/{studentId}/activity-history`: Historial paginado de ejecuciones con resultados y telemetría.
+* `GET /api/guardian/students/{studentId}/observations`: Consulta paginada y filtrada cronológicamente de observaciones docentes para familias (*HU-012*, *Rol: Acudiente autorizado o Administrador*).
 
 ### 10. Bitácora Pedagógica (`/api/students/{id}/pedagogical-notes`) - *HU-010*
 * `POST /api/students/{id}/pedagogical-notes`: Registro de observación cualitativa sobre el estudiante *(Rol: Docente o Administrador)*.
 * `GET /api/students/{id}/pedagogical-notes`: Consulta cronológica de notas cualitativas de la bitácora *(Rol: Docente, Administrador o Acudiente del estudiante)*.
-
----
-
-## 📌 Próximo Alcance: Sprint 4 (Hardening, Observaciones del Acudiente y Cierre)
-
-* **HU-012:** Registro y consulta de observaciones del acudiente hacia el equipo docente (`/api/guardian/observations`).
-* Optimización de rendimiento con índices compuestos en `ActivityAssignments` y `ActivityExecutions`.
-* Verificación integral de respuestas `ProblemDetails` según RFC 7807 y revisión general de seguridad.
+* `PUT /api/log-entries/{id}`: Edición de notas cualitativas *(Rol: Docente o Administrador)*.
+* `DELETE /api/log-entries/{id}`: Eliminación lógica de notas cualitativas *(Rol: Docente o Administrador)*.

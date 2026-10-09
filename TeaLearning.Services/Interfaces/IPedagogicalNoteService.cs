@@ -29,4 +29,14 @@ public interface IPedagogicalNoteService
         Guid currentUserId,
         bool isAdmin,
         CancellationToken cancellationToken = default);
+
+    Task<ApiResponse<ObservationsPagedDto>> GetObservationsPagedForGuardianAsync(
+        Guid studentId,
+        Guid currentUserId,
+        bool isAdmin,
+        int page = 1,
+        int pageSize = 10,
+        string? tipo = null,
+        string? area = null,
+        CancellationToken cancellationToken = default);
 }

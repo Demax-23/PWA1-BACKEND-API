@@ -3,4 +3,5 @@
   <Project Path="TeaLearning.Core/TeaLearning.Core.csproj" />
   <Project Path="TeaLearning.Data/TeaLearning.Data.csproj" />
   <Project Path="TeaLearning.Services/TeaLearning.Services.csproj" />
+  <Project Path="TeaLearning.Tests/TeaLearning.Tests.csproj" />
 </Solution>

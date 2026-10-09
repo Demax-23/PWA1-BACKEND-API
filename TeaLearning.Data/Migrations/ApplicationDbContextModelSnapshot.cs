@@ -625,6 +625,8 @@ namespace TeaLearning.Data.Migrations
 
                     b.HasIndex("StudentProfileId", "FechaRegistro");
 
+                    b.HasIndex("StudentProfileId", "VisibleAcudiente", "FechaRegistro");
+
                     b.ToTable("PedagogicalNotes", (string)null);
                 });
 

@@ -60,6 +60,12 @@ public class UsersController : BaseApiController
             return BadRequest(ApiResponse<UserDto>.Fail("Datos de roles inválidos"));
         }
 
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId.HasValue && currentUserId.Value == id && !dto.Roles.Contains("Administrador", StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(ApiResponse<UserDto>.Fail("No es posible remover el rol de Administrador de la cuenta actualmente en sesión."));
+        }
+
         var result = await _userService.UpdateUserRolesAsync(id, dto);
         if (!result.Success)
         {
@@ -83,6 +89,20 @@ public class UsersController : BaseApiController
             return BadRequest(ApiResponse<UserDto>.Fail("Datos de usuario inválidos"));
         }
 
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId.HasValue && currentUserId.Value == id)
+        {
+            if (dto.IsActive.HasValue && !dto.IsActive.Value)
+            {
+                return BadRequest(ApiResponse<UserDto>.Fail("No es posible desactivar la cuenta del administrador que se encuentra actualmente en sesión."));
+            }
+
+            if (dto.Roles != null && dto.Roles.Any() && !dto.Roles.Contains("Administrador", StringComparer.OrdinalIgnoreCase))
+            {
+                return BadRequest(ApiResponse<UserDto>.Fail("No es posible remover el rol de Administrador de la cuenta actualmente en sesión."));
+            }
+        }
+
         var result = await _userService.UpdateUserAsync(id, dto);
         if (!result.Success)
         {
@@ -101,8 +121,8 @@ public class UsersController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var currentUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (Guid.TryParse(currentUserIdClaim, out var currentUserId) && currentUserId == id)
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId.HasValue && currentUserId.Value == id)
         {
             return BadRequest(ApiResponse<bool>.Fail("No es posible eliminar la cuenta del administrador que se encuentra actualmente en sesión."));
         }

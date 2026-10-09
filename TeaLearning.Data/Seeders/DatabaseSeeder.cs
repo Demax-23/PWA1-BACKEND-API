@@ -15,6 +15,7 @@ public static class DatabaseSeeder
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<ApplicationUser>>();
 
         // Aplicar migraciones pendientes
         if ((await context.Database.GetPendingMigrationsAsync()).Any())
@@ -53,6 +54,11 @@ public static class DatabaseSeeder
                 await userManager.AddToRoleAsync(adminUser, "Administrador");
             }
         }
+        else if (string.IsNullOrEmpty(adminUser.PasswordHash) || !adminUser.PasswordHash.StartsWith("$2"))
+        {
+            adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, "Admin123!*");
+            await userManager.UpdateAsync(adminUser);
+        }
 
         // 3. Sembrar Docente de prueba
         var teacherEmail = "docente@tealearning.com";
@@ -87,6 +93,11 @@ public static class DatabaseSeeder
         }
         else
         {
+            if (string.IsNullOrEmpty(teacherUser.PasswordHash) || !teacherUser.PasswordHash.StartsWith("$2"))
+            {
+                teacherUser.PasswordHash = passwordHasher.HashPassword(teacherUser, "Docente123!*");
+                await userManager.UpdateAsync(teacherUser);
+            }
             teacherProfile = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.UserId == teacherUser.Id);
         }
 
@@ -143,6 +154,11 @@ public static class DatabaseSeeder
         }
         else
         {
+            if (string.IsNullOrEmpty(guardianUser.PasswordHash) || !guardianUser.PasswordHash.StartsWith("$2"))
+            {
+                guardianUser.PasswordHash = passwordHasher.HashPassword(guardianUser, "Acudiente123!*");
+                await userManager.UpdateAsync(guardianUser);
+            }
             guardianProfile = await context.GuardianProfiles.FirstOrDefaultAsync(g => g.UserId == guardianUser.Id);
         }
 
@@ -200,6 +216,11 @@ public static class DatabaseSeeder
         }
         else
         {
+            if (string.IsNullOrEmpty(studentUser.PasswordHash) || !studentUser.PasswordHash.StartsWith("$2"))
+            {
+                studentUser.PasswordHash = passwordHasher.HashPassword(studentUser, "Estudiante123!*");
+                await userManager.UpdateAsync(studentUser);
+            }
             studentProfile = await context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == studentUser.Id);
         }
 

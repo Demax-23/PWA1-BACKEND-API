@@ -126,6 +126,10 @@ public class PedagogicalNoteService : IPedagogicalNoteService
         }
 
         var notes = await _noteRepository.GetByStudentIdAsync(studentId, cancellationToken);
+        if (!isStaff)
+        {
+            notes = notes.Where(n => n.VisibleAcudiente).ToList();
+        }
 
         var dtoList = notes.Select(n => new PedagogicalNoteDto
         {
@@ -222,5 +226,91 @@ public class PedagogicalNoteService : IPedagogicalNoteService
         await _noteRepository.UpdateAsync(note, cancellationToken);
 
         return ApiResponse<bool>.Ok(true, "Observación pedagógica eliminada exitosamente.");
+    }
+
+    public async Task<ApiResponse<ObservationsPagedDto>> GetObservationsPagedForGuardianAsync(
+        Guid studentId,
+        Guid currentUserId,
+        bool isAdmin,
+        int page = 1,
+        int pageSize = 10,
+        string? tipo = null,
+        string? area = null,
+        CancellationToken cancellationToken = default)
+    {
+        var student = await _studentRepository.GetStudentWithDetailsAsync(studentId, cancellationToken);
+        if (student == null)
+        {
+            return ApiResponse<ObservationsPagedDto>.Fail($"Estudiante con ID {studentId} no encontrado.");
+        }
+
+        if (!isAdmin)
+        {
+            if (student.GuardianProfile == null || student.GuardianProfile.UserId != currentUserId)
+            {
+                return ApiResponse<ObservationsPagedDto>.Fail("No tiene autorización para visualizar las observaciones de este estudiante.");
+            }
+        }
+
+        var query = _context.PedagogicalNotes
+            .Include(n => n.TeacherProfile)
+                .ThenInclude(t => t.User)
+            .Where(n => n.StudentProfileId == studentId && n.IsActive);
+
+        // Si es acudiente, solo observaciones habilitadas para el hogar
+        if (!isAdmin)
+        {
+            query = query.Where(n => n.VisibleAcudiente);
+        }
+
+        if (!string.IsNullOrWhiteSpace(tipo))
+        {
+            var tipoClean = tipo.Trim().ToLower();
+            query = query.Where(n => n.Tipo.ToLower() == tipoClean);
+        }
+
+        if (!string.IsNullOrWhiteSpace(area))
+        {
+            var areaClean = area.Trim().ToLower();
+            query = query.Where(n => n.Area.ToLower() == areaClean);
+        }
+
+        int totalCount = await query.CountAsync(cancellationToken);
+
+        int safePage = Math.Max(1, page);
+        int safePageSize = Math.Clamp(pageSize, 1, 100);
+
+        var notes = await query
+            .OrderByDescending(n => n.FechaRegistro)
+            .Skip((safePage - 1) * safePageSize)
+            .Take(safePageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = notes.Select(n => new PedagogicalNoteDto
+        {
+            Id = n.Id,
+            StudentProfileId = n.StudentProfileId,
+            StudentNombre = student.User?.NombreCompleto ?? string.Empty,
+            TeacherProfileId = n.TeacherProfileId,
+            TeacherNombre = n.TeacherProfile?.User?.NombreCompleto ?? "Docente",
+            Contenido = n.Contenido,
+            FechaRegistro = n.FechaRegistro,
+            Titulo = n.Titulo,
+            Tipo = n.Tipo,
+            Area = n.Area,
+            RecomendacionCasa = n.RecomendacionCasa,
+            VisibleAcudiente = n.VisibleAcudiente,
+            AssignmentId = n.AssignmentId
+        }).ToList();
+
+        var pagedResult = new ObservationsPagedDto
+        {
+            Items = items,
+            Total = totalCount,
+            Page = safePage,
+            PageSize = safePageSize
+        };
+
+        return ApiResponse<ObservationsPagedDto>.Ok(pagedResult, "Observaciones pedagógicas recuperadas exitosamente.");
     }
 }

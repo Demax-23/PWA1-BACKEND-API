@@ -27,6 +27,7 @@ public class PedagogicalNoteConfiguration : IEntityTypeConfiguration<Pedagogical
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(pn => new { pn.StudentProfileId, pn.FechaRegistro });
+        builder.HasIndex(pn => new { pn.StudentProfileId, pn.VisibleAcudiente, pn.FechaRegistro });
 
         builder.Property(pn => pn.Titulo)
             .HasMaxLength(100)

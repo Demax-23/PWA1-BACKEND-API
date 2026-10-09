@@ -8,6 +8,7 @@ using TeaLearning.Core.Entities;
 using TeaLearning.Data.Context;
 using TeaLearning.Data.Repositories;
 using TeaLearning.Services.Interfaces;
+using TeaLearning.Services.Security;
 using TeaLearning.Services.Services;
 
 namespace TeaLearning.Api.Extensions;
@@ -35,6 +36,9 @@ public static class ServiceCollectionExtensions
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // 2.1 Reemplazo del algoritmo hash predeterminado (PBKDF2/SHA256) por BCrypt
+        services.AddScoped<IPasswordHasher<ApplicationUser>, BcryptPasswordHasher>();
 
         // 3. Configuración de Autenticación JWT
         var jwtSettings = configuration.GetSection("Jwt");

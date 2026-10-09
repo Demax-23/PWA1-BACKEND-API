@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TeaLearning.Services.Common;
 using TeaLearning.Services.DTOs.Guardian;
+using TeaLearning.Services.DTOs.Pedagogical;
 using TeaLearning.Services.Interfaces;
 
 namespace TeaLearning.Api.Controllers;
@@ -11,10 +12,14 @@ namespace TeaLearning.Api.Controllers;
 public class GuardianController : BaseApiController
 {
     private readonly IGuardianMonitoringService _guardianService;
+    private readonly IPedagogicalNoteService _noteService;
 
-    public GuardianController(IGuardianMonitoringService guardianService)
+    public GuardianController(
+        IGuardianMonitoringService guardianService,
+        IPedagogicalNoteService noteService)
     {
         _guardianService = guardianService;
+        _noteService = noteService;
     }
 
     /// <summary>
@@ -72,6 +77,45 @@ public class GuardianController : BaseApiController
 
         bool isAdmin = User.IsInRole("Administrador");
         var result = await _guardianService.GetActivityHistoryAsync(studentId, currentUserId.Value, isAdmin, page, pageSize, cancellationToken);
+        if (!result.Success)
+        {
+            if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Consulta paginada y optimizada de observaciones pedagógicas del estudiante para su acudiente (HU-012).
+    /// </summary>
+    [HttpGet("students/{studentId:guid}/observations")]
+    [HttpGet("/api/students/{studentId:guid}/observations")]
+    [ProducesResponseType(typeof(ApiResponse<ObservationsPagedDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ObservationsPagedDto>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<ObservationsPagedDto>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<ObservationsPagedDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetObservations(
+        [FromRoute] Guid studentId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? tipo = null,
+        [FromQuery] string? area = null,
+        CancellationToken cancellationToken = default)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(ApiResponse<ObservationsPagedDto>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        bool isAdmin = User.IsInRole("Administrador");
+        var result = await _noteService.GetObservationsPagedForGuardianAsync(
+            studentId, currentUserId.Value, isAdmin, page, pageSize, tipo, area, cancellationToken);
+
         if (!result.Success)
         {
             if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
