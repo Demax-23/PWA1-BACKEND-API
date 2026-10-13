@@ -389,5 +389,160 @@ public static class DatabaseSeeder
             context.PedagogicalNotes.Add(note);
             await context.SaveChangesAsync();
         }
+
+        // 10. Sembrar 10 estudiantes de prueba con datos aleatorios (semilla fija) para validar el panel de desempeño
+        if (classroom != null && teacherProfile != null)
+        {
+            await SeedTestStudentsAsync(context, userManager, classroom, teacherProfile, guardianProfile);
+        }
+    }
+
+    private static async Task SeedTestStudentsAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        Classroom classroom,
+        TeacherProfile teacherProfile,
+        GuardianProfile? guardianProfile)
+    {
+        const int total = 10;
+        const int firstNumber = 3; // estudiante@ y estudiante2@ ya existen: se continúa con estudiante3@ ... estudiante12@
+        var rnd = new Random(2026);
+
+        string[] nombres = ["Sofía", "Santiago", "Valentina", "Juan", "Isabella", "Samuel", "Camila", "Emmanuel", "Luciana", "Tomás", "Mariana", "Nicolás"];
+        string[] apellidos = ["Rodríguez", "Martínez", "López", "García", "Hernández", "Ramírez", "Torres", "Vargas", "Castro", "Moreno", "Rojas", "Díaz"];
+
+        // Módulo y actividades (se cubren los 4 tipos de actividad para el desglose por tipo)
+        var module = await context.LearningModules.OrderBy(m => m.Orden).FirstOrDefaultAsync();
+        if (module == null) return;
+
+        async Task<Activity> EnsureActivityAsync(string titulo, TipoActividad tipo, string config)
+        {
+            var existing = await context.Activities.FirstOrDefaultAsync(a => a.Titulo == titulo);
+            if (existing != null) return existing;
+            var act = new Activity
+            {
+                Titulo = titulo,
+                Descripcion = $"Actividad de prueba ({tipo}).",
+                TipoActividad = tipo,
+                ObjetivoPedagogico = "Actividad de demostración para validar la analítica del aula.",
+                ConfigJson = config,
+                ModuloId = module.Id,
+                DocenteId = teacherProfile.Id
+            };
+            context.Activities.Add(act);
+            await context.SaveChangesAsync();
+            return act;
+        }
+
+        var activities = new List<Activity>
+        {
+            await EnsureActivityAsync("Secuencia de la Mañana Escolar", TipoActividad.SecuenciaLogica, "{\"pasos\":[\"Llegar\",\"Saludar\",\"Guardar la maleta\",\"Sentarse\"]}"),
+            await EnsureActivityAsync("Emparejamiento de Emociones", TipoActividad.EmparejamientoVisual, "{\"pares\":[{\"emocion\":\"Feliz\",\"color\":\"#FFEB3B\"},{\"emocion\":\"Calmado\",\"color\":\"#4CAF50\"}]}"),
+            await EnsureActivityAsync("Reconociendo Emociones (Prueba)", TipoActividad.AsociacionEmocional, "{\"emociones\":[\"Alegría\",\"Tristeza\",\"Enojo\",\"Sorpresa\"]}"),
+            await EnsureActivityAsync("Saludos y Turnos (Prueba)", TipoActividad.RutinaSocial, "{\"escenas\":[\"Saludar a un compañero\",\"Esperar el turno\"]}")
+        };
+
+        for (int i = 0; i < total; i++)
+        {
+            int number = firstNumber + i;
+            var email = $"estudiante{number}@tealearning.com";
+            var codigo = $"EST-TEA-{number:000}";
+
+            // Siempre se consumen los mismos valores aleatorios por iteración para mantener el resultado reproducible
+            var nombre = nombres[rnd.Next(nombres.Length)];
+            var apellido = $"{apellidos[rnd.Next(apellidos.Length)]} {apellidos[rnd.Next(apellidos.Length)]}";
+            var nacimiento = new DateTime(rnd.Next(2015, 2019), rnd.Next(1, 13), rnd.Next(1, 28));
+            var execCount = rnd.Next(2, 7);
+            var assignCount = rnd.Next(3, 5);
+
+            if (await userManager.FindByEmailAsync(email) != null) continue;
+
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Nombres = nombre,
+                Apellidos = apellido,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            var result = await userManager.CreateAsync(user, "Estudiante123!*");
+            if (!result.Succeeded) continue;
+            await userManager.AddToRoleAsync(user, "Estudiante");
+
+            var profile = new StudentProfile
+            {
+                UserId = user.Id,
+                CodigoEstudiante = codigo,
+                FechaNacimiento = nacimiento,
+                ObservacionesMedicasTEA = "Estudiante de prueba con datos generados aleatoriamente (TEA Nivel 1).",
+                ClassroomId = classroom.Id,
+                GuardianProfileId = guardianProfile?.Id
+            };
+            context.StudentProfiles.Add(profile);
+            await context.SaveChangesAsync();
+
+            context.SensoryPreferences.Add(new SensoryPreference
+            {
+                StudentProfileId = profile.Id,
+                PaletaColor = "PastelSuave",
+                Tipografia = "Atkinson Hyperlegible",
+                MayorEspacioEntreLetras = false,
+                AudioActivo = true,
+                VolumenAudio = 60,
+                TextoAVoz = true,
+                AnimacionesReducidas = true,
+                NivelEscalaFuente = 2,
+                ModoContraste = ModoContraste.Estandar,
+                OcultarTemporizadores = true
+            });
+
+            var assignments = new List<ActivityAssignment>();
+            for (int a = 0; a < assignCount; a++)
+            {
+                assignments.Add(new ActivityAssignment
+                {
+                    ActivityId = activities[(i + a) % activities.Count].Id,
+                    StudentProfileId = profile.Id,
+                    FechaInicio = DateTime.UtcNow.Date.AddDays(-28),
+                    FechaLimite = DateTime.UtcNow.Date.AddDays(7),
+                    OrdenSecuencial = a + 1,
+                    Prioridad = (PrioridadActividad)rnd.Next(0, Enum.GetValues<PrioridadActividad>().Length),
+                    Estado = EstadoAsignacion.Pendiente
+                });
+            }
+            context.ActivityAssignments.AddRange(assignments);
+            await context.SaveChangesAsync();
+
+            // Casos borde para validar el tablero: i=0 sin ejecuciones, i=1 con 100%, i=2 con desempeño bajo
+            if (i == 0) continue;
+
+            var executions = new List<ActivityExecution>();
+            for (int e = 0; e < execCount; e++)
+            {
+                var assignment = assignments[e % assignments.Count];
+                int aciertos, fallos;
+                bool completada;
+                if (i == 1) { aciertos = rnd.Next(5, 11); fallos = 0; completada = true; }
+                else if (i == 2) { aciertos = rnd.Next(1, 3); fallos = rnd.Next(5, 9); completada = rnd.Next(0, 4) == 0; }
+                else { aciertos = rnd.Next(2, 11); fallos = rnd.Next(0, 7); completada = rnd.Next(0, 10) < 7; }
+
+                executions.Add(new ActivityExecution
+                {
+                    AssignmentId = assignment.Id,
+                    StudentProfileId = profile.Id,
+                    TiempoRespuestaSegundos = rnd.Next(15, 121),
+                    CantidadAciertos = aciertos,
+                    CantidadIntentosFallidos = fallos,
+                    CompletadaExitosamente = completada,
+                    FechaRegistro = DateTime.UtcNow.AddDays(-rnd.Next(0, 28)).AddMinutes(-rnd.Next(0, 600))
+                });
+                if (completada) assignment.Estado = EstadoAsignacion.Completada;
+                else if (assignment.Estado == EstadoAsignacion.Pendiente) assignment.Estado = EstadoAsignacion.EnProgreso;
+            }
+            context.ActivityExecutions.AddRange(executions);
+            await context.SaveChangesAsync();
+        }
     }
 }
