@@ -39,6 +39,8 @@ public class ActivityAssignmentRepository : GenericRepository<ActivityAssignment
                 .ThenInclude(s => s.User)
             .Include(aa => aa.StudentProfile)
                 .ThenInclude(s => s.SensoryPreference)
+            .Include(aa => aa.CalificadoPorDocente)
+                .ThenInclude(d => d!.User)
             .Include(aa => aa.Executions)
             .FirstOrDefaultAsync(aa => aa.Id == id && aa.IsActive, cancellationToken);
     }
@@ -54,6 +56,9 @@ public class ActivityAssignmentRepository : GenericRepository<ActivityAssignment
                 .ThenInclude(a => a.Modulo)
             .Include(aa => aa.StudentProfile)
                 .ThenInclude(s => s.User)
+            .Include(aa => aa.CalificadoPorDocente)
+                .ThenInclude(d => d!.User)
+            .Include(aa => aa.Executions)
             .Where(aa => aa.IsActive && aa.Activity.IsActive);
 
         if (studentProfileId.HasValue)

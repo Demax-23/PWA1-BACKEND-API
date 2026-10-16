@@ -13,15 +13,18 @@ public class UserService : IUserService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly ApplicationDbContext _context;
+    private readonly IFileStorageService _fileStorageService;
 
     public UserService(
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole<Guid>> roleManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IFileStorageService fileStorageService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _context = context;
+        _fileStorageService = fileStorageService;
     }
 
     public async Task<ApiResponse<List<UserDto>>> GetAllUsersAsync()
@@ -61,6 +64,7 @@ public class UserService : IUserService
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
                 UltimaActividadAt = user.UltimaActividadAt,
+                AvatarUrl = user.AvatarUrl,
                 EstudianteId = user.StudentProfile?.Id,
                 DocenteId = user.TeacherProfile?.Id,
                 AcudienteId = user.GuardianProfile?.Id,
@@ -109,6 +113,7 @@ public class UserService : IUserService
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
             UltimaActividadAt = user.UltimaActividadAt,
+            AvatarUrl = user.AvatarUrl,
             EstudianteId = user.StudentProfile?.Id,
             DocenteId = user.TeacherProfile?.Id,
             AcudienteId = user.GuardianProfile?.Id,
@@ -169,6 +174,7 @@ public class UserService : IUserService
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
             UltimaActividadAt = user.UltimaActividadAt,
+            AvatarUrl = user.AvatarUrl,
             EstudianteId = studentProfile?.Id,
             DocenteId = teacherProfile?.Id,
             AcudienteId = guardianProfile?.Id
@@ -266,6 +272,7 @@ public class UserService : IUserService
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
             UltimaActividadAt = user.UltimaActividadAt,
+            AvatarUrl = user.AvatarUrl,
             EstudianteId = studentProfile?.Id,
             DocenteId = teacherProfile?.Id,
             AcudienteId = guardianProfile?.Id
@@ -381,5 +388,65 @@ public class UserService : IUserService
 
         var linkedUserIds = targetStudents.Select(s => s.UserId).ToList();
         return ApiResponse<List<Guid>>.Ok(linkedUserIds, $"Se vincularon exitosamente {linkedUserIds.Count} estudiantes al acudiente.");
+    }
+
+    public async Task<ApiResponse<UserDto>> GetCurrentUserProfileAsync(Guid userId)
+    {
+        return await GetUserByIdAsync(userId);
+    }
+
+    public async Task<ApiResponse<UserDto>> UpdateAvatarAsync(Guid userId, Stream fileStream, string originalFileName, string contentType, CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return ApiResponse<UserDto>.Fail("Usuario no encontrado.");
+        }
+
+        // Si ya tenía avatar anterior, eliminar el archivo previo
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+        {
+            await _fileStorageService.DeleteFileAsync(user.AvatarUrl, cancellationToken);
+        }
+
+        string avatarRelativeUrl;
+        try
+        {
+            avatarRelativeUrl = await _fileStorageService.SaveAvatarAsync(userId, fileStream, originalFileName, contentType, cancellationToken);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiResponse<UserDto>.Fail(ex.Message);
+        }
+
+        user.AvatarUrl = avatarRelativeUrl;
+        user.UltimaActividadAt = DateTime.UtcNow;
+        var updateResult = await _userManager.UpdateAsync(user);
+
+        if (!updateResult.Succeeded)
+        {
+            return ApiResponse<UserDto>.Fail("Error al guardar la foto de perfil en la base de datos.");
+        }
+
+        return await GetUserByIdAsync(userId);
+    }
+
+    public async Task<ApiResponse<bool>> RemoveAvatarAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return ApiResponse<bool>.Fail("Usuario no encontrado.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+        {
+            await _fileStorageService.DeleteFileAsync(user.AvatarUrl, cancellationToken);
+            user.AvatarUrl = null;
+            user.UltimaActividadAt = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+        }
+
+        return ApiResponse<bool>.Ok(true, "Foto de perfil eliminada exitosamente.");
     }
 }

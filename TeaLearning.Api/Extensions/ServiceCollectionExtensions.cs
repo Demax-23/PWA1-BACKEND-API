@@ -85,6 +85,7 @@ public static class ServiceCollectionExtensions
         // 5. Registro de Servicios de Lógica de Negocio
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<ISensoryPreferenceService, SensoryPreferenceService>();

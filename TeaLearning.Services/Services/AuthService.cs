@@ -203,6 +203,7 @@ public class AuthService : IAuthService
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
                 UltimaActividadAt = user.UltimaActividadAt,
+                AvatarUrl = user.AvatarUrl,
                 EstudianteId = studentId,
                 DocenteId = teacherId,
                 AcudienteId = guardianId,
@@ -271,6 +272,7 @@ public class AuthService : IAuthService
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
                 UltimaActividadAt = user.UltimaActividadAt,
+                AvatarUrl = user.AvatarUrl,
                 EstudianteId = studentProfile?.Id,
                 DocenteId = teacherProfile?.Id,
                 AcudienteId = guardianProfile?.Id

@@ -93,4 +93,62 @@ public class AssignmentsController : BaseApiController
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Califica una actividad asignada o actualiza su calificación cuantitativa y cualitativa (Rol Docente).
+    /// </summary>
+    [HttpPut("{id:guid}/grade")]
+    [Authorize(Roles = "Docente,Administrador")]
+    [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Grade(Guid id, [FromBody] GradeAssignmentDto dto, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return BadRequest(ApiResponse<AssignmentGradeDto>.Fail("Datos de calificación inválidos", errors));
+        }
+
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<AssignmentGradeDto>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        var result = await _assignmentService.GradeAssignmentAsync(id, userId.Value, dto, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Elimina la calificación de una actividad asignada (la devuelve al estado sin calificar).
+    /// </summary>
+    [HttpDelete("{id:guid}/grade")]
+    [Authorize(Roles = "Docente,Administrador")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveGrade(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<bool>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        var result = await _assignmentService.RemoveGradeAsync(id, userId.Value, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
 }

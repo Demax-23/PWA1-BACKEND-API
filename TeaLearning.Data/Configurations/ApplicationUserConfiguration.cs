@@ -21,6 +21,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.RefreshToken)
             .HasMaxLength(500);
 
+        builder.Property(u => u.AvatarUrl)
+            .HasMaxLength(500);
+
         builder.HasOne(u => u.StudentProfile)
             .WithOne(s => s.User)
             .HasForeignKey<StudentProfile>(s => s.UserId)

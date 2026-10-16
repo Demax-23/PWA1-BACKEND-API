@@ -197,6 +197,109 @@ public class AssignmentService : IAssignmentService
         return ApiResponse<bool>.Ok(true, "Asignación eliminada exitosamente");
     }
 
+    public async Task<ApiResponse<AssignmentGradeDto>> GradeAssignmentAsync(
+        Guid assignmentId, 
+        Guid currentUserId, 
+        GradeAssignmentDto dto, 
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await _assignmentRepository.GetWithDetailsAsync(assignmentId, cancellationToken);
+        if (assignment == null)
+        {
+            return ApiResponse<AssignmentGradeDto>.Fail($"La asignación con ID {assignmentId} no existe.");
+        }
+
+        var teacher = await _context.TeacherProfiles
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.IsActive, cancellationToken);
+
+        var currentUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == currentUserId, cancellationToken);
+
+        assignment.Calificacion = Math.Round(dto.Calificacion, 1);
+        assignment.ComentarioCalificacion = string.IsNullOrWhiteSpace(dto.Comentario) ? null : dto.Comentario.Trim();
+        assignment.FechaCalificacion = DateTime.UtcNow;
+
+        if (teacher != null)
+        {
+            assignment.CalificadoPorDocenteId = teacher.Id;
+            assignment.CalificadoPorDocente = teacher;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var responseDto = MapToGradeDto(assignment, teacher?.User?.NombreCompleto ?? currentUser?.NombreCompleto);
+        return ApiResponse<AssignmentGradeDto>.Ok(responseDto, "Calificación guardada exitosamente.");
+    }
+
+    public async Task<ApiResponse<bool>> RemoveGradeAsync(
+        Guid assignmentId, 
+        Guid currentUserId, 
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await _assignmentRepository.GetByIdAsync(assignmentId, cancellationToken);
+        if (assignment == null)
+        {
+            return ApiResponse<bool>.Fail($"La asignación con ID {assignmentId} no existe.");
+        }
+
+        assignment.Calificacion = null;
+        assignment.ComentarioCalificacion = null;
+        assignment.FechaCalificacion = null;
+        assignment.CalificadoPorDocenteId = null;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return ApiResponse<bool>.Ok(true, "Calificación removida exitosamente.");
+    }
+
+    public async Task<ApiResponse<List<AssignmentGradeDto>>> GetStudentGradesAsync(
+        Guid studentProfileId, 
+        Guid currentUserId, 
+        CancellationToken cancellationToken = default)
+    {
+        var student = await _studentRepository.GetByIdAsync(studentProfileId, cancellationToken);
+        if (student == null)
+        {
+            return ApiResponse<List<AssignmentGradeDto>>.Fail($"El estudiante con ID {studentProfileId} no existe.");
+        }
+
+        var assignments = await _assignmentRepository.GetFilteredAsync(
+            studentProfileId: studentProfileId, 
+            cancellationToken: cancellationToken);
+
+        var list = assignments.Select(a => MapToGradeDto(a)).ToList();
+        return ApiResponse<List<AssignmentGradeDto>>.Ok(list, "Calificaciones recuperadas exitosamente.");
+    }
+
+    private static AssignmentGradeDto MapToGradeDto(ActivityAssignment a, string? fallbackDocenteNombre = null)
+    {
+        var lastAttempt = a.Executions?
+            .OrderByDescending(e => e.FechaRegistro)
+            .FirstOrDefault();
+
+        return new AssignmentGradeDto
+        {
+            AssignmentId = a.Id,
+            ActivityId = a.ActivityId,
+            Titulo = a.Activity?.Titulo ?? "Actividad pedagógica",
+            TipoActividad = a.Activity?.TipoActividad.ToString() ?? "Actividad",
+            Calificacion = a.Calificacion,
+            Comentario = a.ComentarioCalificacion,
+            FechaCalificacion = a.FechaCalificacion,
+            DocenteNombre = a.CalificadoPorDocente?.User?.NombreCompleto ?? fallbackDocenteNombre,
+            PuedeEditar = true,
+            UltimoIntento = lastAttempt == null ? null : new ActivityLastAttemptDto
+            {
+                FechaRegistro = lastAttempt.FechaRegistro,
+                CantidadAciertos = lastAttempt.CantidadAciertos,
+                CantidadIntentosFallidos = lastAttempt.CantidadIntentosFallidos,
+                CompletadaExitosamente = lastAttempt.CompletadaExitosamente,
+                TiempoRespuestaSegundos = lastAttempt.TiempoRespuestaSegundos
+            },
+            TotalIntentos = a.Executions?.Count ?? 0
+        };
+    }
+
     private static AssignmentDto MapToDto(ActivityAssignment a)
     {
         return new AssignmentDto

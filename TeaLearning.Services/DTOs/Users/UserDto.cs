@@ -11,6 +11,7 @@ public class UserDto
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UltimaActividadAt { get; set; }
+    public string? AvatarUrl { get; set; }
 
     // Identificadores de perfiles asociados si aplican
     public Guid? EstudianteId { get; set; }

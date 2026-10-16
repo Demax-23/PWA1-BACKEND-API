@@ -216,6 +216,17 @@ namespace TeaLearning.Data.Migrations
                     b.Property<Guid>("ActivityId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal?>("Calificacion")
+                        .HasPrecision(3, 1)
+                        .HasColumnType("decimal(3,1)");
+
+                    b.Property<Guid?>("CalificadoPorDocenteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ComentarioCalificacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -223,6 +234,9 @@ namespace TeaLearning.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("FechaCalificacion")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("FechaInicio")
                         .HasColumnType("datetime2");
@@ -250,6 +264,8 @@ namespace TeaLearning.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ActivityId");
+
+                    b.HasIndex("CalificadoPorDocenteId");
 
                     b.HasIndex("StudentProfileId", "FechaInicio", "OrdenSecuencial");
 
@@ -314,6 +330,10 @@ namespace TeaLearning.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -856,6 +876,11 @@ namespace TeaLearning.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TeaLearning.Core.Entities.TeacherProfile", "CalificadoPorDocente")
+                        .WithMany()
+                        .HasForeignKey("CalificadoPorDocenteId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("TeaLearning.Core.Entities.StudentProfile", "StudentProfile")
                         .WithMany("Assignments")
                         .HasForeignKey("StudentProfileId")
@@ -863,6 +888,8 @@ namespace TeaLearning.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Activity");
+
+                    b.Navigation("CalificadoPorDocente");
 
                     b.Navigation("StudentProfile");
                 });

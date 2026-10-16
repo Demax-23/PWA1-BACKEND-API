@@ -30,6 +30,17 @@ public class ActivityAssignmentConfiguration : IEntityTypeConfiguration<Activity
             .HasForeignKey(aa => aa.StudentProfileId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Property(aa => aa.Calificacion)
+            .HasPrecision(3, 1);
+
+        builder.Property(aa => aa.ComentarioCalificacion)
+            .HasMaxLength(500);
+
+        builder.HasOne(aa => aa.CalificadoPorDocente)
+            .WithMany()
+            .HasForeignKey(aa => aa.CalificadoPorDocenteId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasIndex(aa => new { aa.StudentProfileId, aa.FechaInicio, aa.OrdenSecuencial });
     }
 }

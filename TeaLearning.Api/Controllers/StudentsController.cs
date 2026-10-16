@@ -4,6 +4,7 @@ using TeaLearning.Core.Enums;
 using TeaLearning.Data.Repositories;
 using TeaLearning.Services.Common;
 using TeaLearning.Services.DTOs.Achievements;
+using TeaLearning.Services.DTOs.Assignments;
 using TeaLearning.Services.DTOs.Students;
 using TeaLearning.Services.Interfaces;
 
@@ -14,15 +15,18 @@ public class StudentsController : BaseApiController
 {
     private readonly IStudentService _studentService;
     private readonly IAchievementService _achievementService;
+    private readonly IAssignmentService _assignmentService;
     private readonly IActivityAssignmentRepository _assignmentRepository;
 
     public StudentsController(
         IStudentService studentService,
         IAchievementService achievementService,
+        IAssignmentService assignmentService,
         IActivityAssignmentRepository assignmentRepository)
     {
         _studentService = studentService;
         _achievementService = achievementService;
+        _assignmentService = assignmentService;
         _assignmentRepository = assignmentRepository;
     }
 
@@ -120,25 +124,27 @@ public class StudentsController : BaseApiController
     }
 
     /// <summary>
-    /// Consulta las actividades asignadas al estudiante para fines de bitácora y calificaciones (HU-010).
+    /// Consulta las actividades asignadas al estudiante con sus calificaciones e historial de intentos (HU-010 / Sprint 4).
     /// </summary>
     [HttpGet("{studentId:guid}/grades")]
     [Authorize(Roles = "Docente,Administrador")]
+    [ProducesResponseType(typeof(ApiResponse<List<AssignmentGradeDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<AssignmentGradeDto>>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStudentGrades([FromRoute] Guid studentId, CancellationToken cancellationToken)
     {
-        var assignments = await _assignmentRepository.GetFilteredAsync(studentProfileId: studentId, cancellationToken: cancellationToken);
-        var result = assignments.Select(a => new
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
         {
-            AssignmentId = a.Id,
-            Titulo = a.Activity?.Titulo ?? "Actividad pedagógica",
-            TipoActividad = a.Activity?.TipoActividad.ToString() ?? "Actividad",
-            Calificacion = a.Estado == EstadoAsignacion.Completada ? (double?)4.5 : null,
-            Comentario = a.Estado == EstadoAsignacion.Completada ? "Completada con éxito" : null,
-            FechaCalificacion = a.UpdatedAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? a.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss"),
-            PuedeEditar = true
-        }).ToList();
+            return Unauthorized(ApiResponse<List<AssignmentGradeDto>>.Fail("No se pudo identificar al usuario autenticado."));
+        }
 
-        return Ok(ApiResponse<object>.Ok(result, "Calificaciones recuperadas exitosamente."));
+        var result = await _assignmentService.GetStudentGradesAsync(studentId, userId.Value, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
     }
 }
 

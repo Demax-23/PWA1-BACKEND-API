@@ -25,6 +25,9 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
+// Habilitar archivos estáticos (para avatares y recursos multimedia en wwwroot)
+app.UseStaticFiles();
+
 // Habilitar CORS
 app.UseCors("AllowAllPolicy");
 

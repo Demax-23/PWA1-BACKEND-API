@@ -12,6 +12,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UltimaActividadAt { get; set; }
+    public string? AvatarUrl { get; set; }
 
     // Relaciones 1:1 opcionales con perfiles de rol
     public virtual StudentProfile? StudentProfile { get; set; }
