@@ -31,6 +31,9 @@ app.UseStaticFiles();
 // Habilitar CORS
 app.UseCors("AllowAllPolicy");
 
+// Limitación de solicitudes (restablecimiento de contraseña)
+app.UseRateLimiter();
+
 // Autenticación y Autorización RBAC
 app.UseAuthentication();
 app.UseAuthorization();

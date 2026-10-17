@@ -1,12 +1,15 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using TeaLearning.Core.Entities;
 using TeaLearning.Data.Context;
 using TeaLearning.Data.Repositories;
+using TeaLearning.Services.Common;
 using TeaLearning.Services.Interfaces;
 using TeaLearning.Services.Security;
 using TeaLearning.Services.Services;
@@ -36,6 +39,13 @@ public static class ServiceCollectionExtensions
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // 2.0 Vigencia corta para los tokens de restablecimiento de contraseña (por defecto Identity usa 1 día)
+        var tokenLifespanMinutes = int.TryParse(configuration["PasswordReset:TokenLifespanMinutes"], out var lifespan) && lifespan > 0
+            ? lifespan
+            : 30;
+        services.Configure<DataProtectionTokenProviderOptions>(options =>
+            options.TokenLifespan = TimeSpan.FromMinutes(tokenLifespanMinutes));
 
         // 2.1 Reemplazo del algoritmo hash predeterminado (PBKDF2/SHA256) por BCrypt
         services.AddScoped<IPasswordHasher<ApplicationUser>, BcryptPasswordHasher>();
@@ -98,6 +108,30 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGuardianMonitoringService, GuardianMonitoringService>();
         services.AddScoped<IPedagogicalNoteService, PedagogicalNoteService>();
         services.AddScoped<IAchievementService, AchievementService>();
+
+        // 5.1 Correo transaccional y restablecimiento de contraseña
+        services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
+        services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
+
+        // 5.2 Limitación de solicitudes por IP para evitar abuso del envío de correos y fuerza bruta sobre el token
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            static RateLimitPartition<string> PerIp(HttpContext context, int permitLimit) =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
+                        Window = TimeSpan.FromMinutes(15),
+                        QueueLimit = 0
+                    });
+
+            options.AddPolicy("password-reset-request", context => PerIp(context, 5));
+            options.AddPolicy("password-reset-confirm", context => PerIp(context, 10));
+        });
 
         // 6. Configuración de CORS
         services.AddCors(options =>

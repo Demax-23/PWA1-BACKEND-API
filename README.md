@@ -25,6 +25,7 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 | **Hardening de Seguridad & Admin Protection** | — | Prevención de auto-eliminación, auto-desactivación y auto-democión del rol `Administrador`. | ✅ Completado |
 | **Optimización de Base de Datos** | — | Índices compuestos en `ActivityAssignments`, `ActivityExecutions` y `PedagogicalNotes` en SQL Server. | ✅ Completado |
 | **Manejo Global RFC 7807 (ProblemDetails)** | — | Middleware de excepciones con encabezado `application/problem+json` y propiedades estándar RFC 7807. | ✅ Completado |
+| **Recuperación de Contraseña (SMTP + Acudiente)** | — | Restablecimiento por correo (`MailKit` SMTP + Gmail App Password) para `Administrador`, `Docente` y `Acudiente`, y restablecimiento directo por plataforma para `Estudiante` a través de su acudiente titular. | ✅ Completado |
 
 ---
 
@@ -34,7 +35,8 @@ El sistema implementa interfaces accesibles con perfiles sensoriales personaliza
 * **Framework Web:** ASP.NET Core Web API
 * **Persistencia & ORM:** Entity Framework Core 9 (Code First)
 * **Base de Datos:** Microsoft SQL Server (LocalDB / SQL Server Express / Developer)
-* **Seguridad & Auth:** ASP.NET Core Identity (`IdentityDbContext`) con hashing de contraseñas mediante **BCrypt** (`BCrypt.Net-Next`, factor de trabajo 11) en reemplazo del algoritmo predeterminado PBKDF2/SHA-256, autenticación basada en tokens JWT (`JwtBearer`) y Claims estructurados.
+* **Seguridad & Auth:** ASP.NET Core Identity (`IdentityDbContext`) con hashing de contraseñas mediante **BCrypt** (`BCrypt.Net-Next`, factor de trabajo 11) en reemplazo del algoritmo predeterminado PBKDF2/SHA-256, autenticación basada en tokens JWT (`JwtBearer`), Claims estructurados, tokens de recuperación firmados (`DataProtectorTokenProvider`, 30 min) y `RateLimiter` por IP.
+* **Notificaciones por Correo:** `MailKit` (SMTP sobre TLS/STARTTLS en puerto 587).
 * **Documentación Interactiva:** Swagger / OpenAPI (`Swashbuckle.AspNetCore`) con soporte para autorización Bearer Token.
 
 ---
@@ -122,12 +124,19 @@ cd PWA1-BACKEND-API
 dotnet restore
 ```
 
-### 2. Aplicar Migraciones a la Base de Datos
+### 2. Configurar Secreto SMTP (Contraseña de Aplicación de Gmail)
+La cuenta emisora `tealearning.notificaciones@gmail.com` está configurada en `appsettings.json`, pero la contraseña de aplicación de 16 caracteres **no se almacena en el repositorio**. Configúrala localmente con `.NET User Secrets`:
+```bash
+dotnet user-secrets set "Email:Password" "TU_CLAVE_DE_16_CARACTERES" --project TeaLearning.Api
+```
+*(En entornos de producción o contenedores, define la variable de entorno `Email__Password` con la clave de 16 caracteres sin espacios).*
+
+### 3. Aplicar Migraciones a la Base de Datos
 ```bash
 dotnet ef database update --project TeaLearning.Data --startup-project TeaLearning.Api
 ```
 
-### 3. Iniciar la Aplicación
+### 4. Iniciar la Aplicación
 ```bash
 dotnet run --project TeaLearning.Api --launch-profile http
 ```
@@ -138,21 +147,25 @@ dotnet run --project TeaLearning.Api --launch-profile http
 
 ## 👤 Credenciales de Prueba (Semillero Automático)
 
-| Rol | Correo Electrónico | Contraseña | Perfil Asociado |
-|---|---|---|---|
-| **Administrador** | `admin@tealearning.com` | `Admin123!*` | Administrador del Sistema |
-| **Docente** | `docente@tealearning.com` | `Docente123!*` | `TeacherProfile` y `Classroom` ("Aula Azul") |
-| **Acudiente** | `acudiente@tealearning.com` | `Acudiente123!*` | `GuardianProfile` con relación a Mateo Pérez |
-| **Estudiante** | `estudiante@tealearning.com` | `Estudiante123!*` | `StudentProfile` (`EST-TEA-001`) + `SensoryPreference` |
+El semillero (`DatabaseSeeder`) crea —o migra automáticamente de forma idempotente desde los antiguos correos `@tealearning.com`— las siguientes cuentas para que los roles con recuperación por correo apunten a buzones reales mediante subaddressing (`+`) en Gmail:
+
+| Rol | Correo Electrónico | Contraseña | Recuperación de Contraseña | Perfil Asociado |
+|---|---|---|---|---|
+| **Administrador** | `tealearning.rol+administrador@gmail.com` | `Admin123!*` | Por correo electrónico (`tealearning.rol@gmail.com`) | Administrador del Sistema |
+| **Docente** | `tealearning.rol+docente@gmail.com` | `Docente123!*` | Por correo electrónico (`tealearning.rol@gmail.com`) | `TeacherProfile` y `Classroom` ("Aula Azul") |
+| **Acudiente** | `tealearning.rol+acudiente@gmail.com` | `Acudiente123!*` | Por correo electrónico (`tealearning.rol@gmail.com`) | `GuardianProfile` con relación a Mateo Pérez |
+| **Estudiante** | `estudiante@tealearning.com` | `Estudiante123!*` | Desde plataforma por su **Acudiente titular** | `StudentProfile` (`EST-TEA-001`) + `SensoryPreference` |
 
 ---
 
 ## 🔌 Catálogo Completo de Endpoints (Sprints 1, 2, 3 y 4)
 
-### 1. Autenticación (`/api/auth`)
+### 1. Autenticación y Recuperación de Contraseña (`/api/auth`)
 * `POST /api/auth/login`: Autentica credenciales y emite JWT + Refresh Token.
 * `POST /api/auth/register`: Registra un usuario y crea su perfil según el rol.
 * `POST /api/auth/refresh-token`: Renueva el token de acceso con refresh token.
+* `POST /api/auth/forgot-password`: Solicita enlace de restablecimiento por correo electrónico (solo roles `Administrador`, `Docente` y `Acudiente`; respuesta genérica `200 OK` anti-enumeración; protegido con rate limit de 5 solicitudes / 15 min por IP).
+* `POST /api/auth/reset-password`: Confirma el restablecimiento con token codificado en Base64Url, aplica nueva contraseña con hash BCrypt, invalida sesiones previas (`RefreshToken` y `SecurityStamp`) y envía correo de confirmación (protegido con rate limit de 10 solicitudes / 15 min por IP).
 
 ### 2. Gestión de Usuarios y Roles (`/api/users`)
 * `GET /api/users`: Lista usuarios con sus roles y perfiles *(Rol: Administrador)*.
@@ -197,10 +210,11 @@ dotnet run --project TeaLearning.Api --launch-profile http
 * `GET /api/analytics/teacher/students/{id}/summary`: Analítica individual por estudiante (tasa aciertos global, tiempos por tipo de actividad, curva de intentos y evolución semanal) *(Rol: Docente o Administrador)*.
 * `GET /api/analytics/teacher/classes/{classId}`: Analítica consolidada por aula con listado comparativo de desempeño de estudiantes *(Rol: Docente o Administrador)*.
 
-### 9. Monitoreo para el Acudiente (`/api/guardian`) - *HU-009 & HU-012*
+### 9. Monitoreo y Seguridad para el Acudiente (`/api/guardian`) - *HU-009 & HU-012*
 * `GET /api/guardian/students/{studentId}/progress`: Resumen de avance, tiempo total invertido, historial de ejecuciones y mensaje pedagógico empático *(Rol: Acudiente autorizado o Administrador)*.
 * `GET /api/guardian/students/{studentId}/activity-history`: Historial paginado de ejecuciones con resultados y telemetría.
 * `GET /api/guardian/students/{studentId}/observations`: Consulta paginada y filtrada cronológicamente de observaciones docentes para familias (*HU-012*, *Rol: Acudiente autorizado o Administrador*).
+* `POST /api/guardian/students/{studentId}/reset-password`: Restablece directamente la contraseña de un estudiante vinculado e invalida sus sesiones activas *(Exclusivo para el Rol: Acudiente titular del estudiante)*.
 
 ### 10. Bitácora Pedagógica (`/api/students/{id}/pedagogical-notes`) - *HU-010*
 * `POST /api/students/{id}/pedagogical-notes`: Registro de observación cualitativa sobre el estudiante *(Rol: Docente o Administrador)*.

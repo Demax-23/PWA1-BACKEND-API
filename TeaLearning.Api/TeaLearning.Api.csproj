@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\TeaLearning.Services\TeaLearning.Services.csproj" />
@@ -9,6 +9,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>4ad7164a-051a-4593-bff0-f50048722d10</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

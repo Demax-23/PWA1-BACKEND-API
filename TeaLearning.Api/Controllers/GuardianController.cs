@@ -13,13 +13,16 @@ public class GuardianController : BaseApiController
 {
     private readonly IGuardianMonitoringService _guardianService;
     private readonly IPedagogicalNoteService _noteService;
+    private readonly IUserService _userService;
 
     public GuardianController(
         IGuardianMonitoringService guardianService,
-        IPedagogicalNoteService noteService)
+        IPedagogicalNoteService noteService,
+        IUserService userService)
     {
         _guardianService = guardianService;
         _noteService = noteService;
+        _userService = userService;
     }
 
     /// <summary>
@@ -123,6 +126,53 @@ public class GuardianController : BaseApiController
                 return StatusCode(StatusCodes.Status403Forbidden, result);
             }
             return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Restablece la contraseña de un estudiante vinculado. Solo el acudiente titular puede hacerlo.
+    /// La nueva contraseña debe cumplir la política de Identity (mínimo 6 caracteres y 1 dígito).
+    /// </summary>
+    [HttpPost("students/{studentId:guid}/reset-password")]
+    [Authorize(Roles = "Acudiente")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResetStudentPassword(
+        [FromRoute] Guid studentId,
+        [FromBody] ResetStudentPasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return BadRequest(ApiResponse<bool>.Fail("Datos de contraseña inválidos", errors));
+        }
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(ApiResponse<bool>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        var result = await _userService.ResetStudentPasswordAsync(currentUserId.Value, studentId, dto.NewPassword);
+        if (!result.Success)
+        {
+            if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
+            if (result.Message.Contains("no encontrado", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(result);
+            }
+            return BadRequest(result);
         }
 
         return Ok(result);

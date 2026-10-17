@@ -9,6 +9,38 @@ namespace TeaLearning.Data.Seeders;
 
 public static class DatabaseSeeder
 {
+    // Correos reales (alias de Gmail) para poder recibir el restablecimiento de contraseña.
+    // El estudiante conserva su correo ficticio: no recibe correos, su contraseña la restablece el acudiente.
+    private const string AdminEmail = "tealearning.rol+administrador@gmail.com";
+    private const string TeacherEmail = "tealearning.rol+docente@gmail.com";
+    private const string GuardianEmail = "tealearning.rol+acudiente@gmail.com";
+
+    private const string LegacyAdminEmail = "admin@tealearning.com";
+    private const string LegacyTeacherEmail = "docente@tealearning.com";
+    private const string LegacyGuardianEmail = "acudiente@tealearning.com";
+
+    /// <summary>
+    /// Migra de forma idempotente un usuario sembrado con el correo antiguo (@tealearning.com) al correo real.
+    /// No hace nada si el usuario antiguo no existe o si ya existe uno con el correo nuevo.
+    /// </summary>
+    private static async Task RenameLegacyUserEmailAsync(
+        UserManager<ApplicationUser> userManager,
+        string legacyEmail,
+        string newEmail)
+    {
+        var legacyUser = await userManager.FindByEmailAsync(legacyEmail);
+        if (legacyUser == null || await userManager.FindByEmailAsync(newEmail) != null)
+        {
+            return;
+        }
+
+        legacyUser.Email = newEmail;
+        legacyUser.NormalizedEmail = userManager.NormalizeEmail(newEmail);
+        legacyUser.UserName = newEmail;
+        legacyUser.NormalizedUserName = userManager.NormalizeName(newEmail);
+        await userManager.UpdateAsync(legacyUser);
+    }
+
     public static async Task SeedAsync(IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
@@ -34,7 +66,8 @@ public static class DatabaseSeeder
         }
 
         // 2. Sembrar Administrador por defecto
-        var adminEmail = "admin@tealearning.com";
+        var adminEmail = AdminEmail;
+        await RenameLegacyUserEmailAsync(userManager, LegacyAdminEmail, adminEmail);
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
         if (adminUser == null)
         {
@@ -61,7 +94,8 @@ public static class DatabaseSeeder
         }
 
         // 3. Sembrar Docente de prueba
-        var teacherEmail = "docente@tealearning.com";
+        var teacherEmail = TeacherEmail;
+        await RenameLegacyUserEmailAsync(userManager, LegacyTeacherEmail, teacherEmail);
         var teacherUser = await userManager.FindByEmailAsync(teacherEmail);
         TeacherProfile? teacherProfile = null;
         if (teacherUser == null)
@@ -121,7 +155,8 @@ public static class DatabaseSeeder
         }
 
         // 5. Sembrar Acudiente de prueba
-        var guardianEmail = "acudiente@tealearning.com";
+        var guardianEmail = GuardianEmail;
+        await RenameLegacyUserEmailAsync(userManager, LegacyGuardianEmail, guardianEmail);
         var guardianUser = await userManager.FindByEmailAsync(guardianEmail);
         GuardianProfile? guardianProfile = null;
         if (guardianUser == null)

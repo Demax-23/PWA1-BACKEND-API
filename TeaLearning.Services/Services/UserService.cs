@@ -390,6 +390,42 @@ public class UserService : IUserService
         return ApiResponse<List<Guid>>.Ok(linkedUserIds, $"Se vincularon exitosamente {linkedUserIds.Count} estudiantes al acudiente.");
     }
 
+    public async Task<ApiResponse<bool>> ResetStudentPasswordAsync(Guid guardianUserId, Guid studentId, string newPassword)
+    {
+        // El identificador puede ser el de StudentProfile o el del usuario, igual que en LinkStudentsToGuardianAsync.
+        var student = await _context.StudentProfiles
+            .Include(s => s.User)
+            .Include(s => s.GuardianProfile)
+            .FirstOrDefaultAsync(s => s.Id == studentId || s.UserId == studentId);
+
+        if (student == null || student.User == null)
+        {
+            return ApiResponse<bool>.Fail("Estudiante no encontrado.");
+        }
+
+        // Solo el acudiente titular puede cambiar la contraseña de su estudiante.
+        if (student.GuardianProfile == null || student.GuardianProfile.UserId != guardianUserId)
+        {
+            return ApiResponse<bool>.Fail("No tiene autorización para modificar la contraseña de este estudiante.");
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(student.User);
+        var result = await _userManager.ResetPasswordAsync(student.User, token, newPassword);
+        if (!result.Succeeded)
+        {
+            return ApiResponse<bool>.Fail(
+                "No fue posible actualizar la contraseña del estudiante.",
+                IdentityErrorTranslator.Translate(result.Errors));
+        }
+
+        // Cierra las sesiones renovables previas del estudiante.
+        student.User.RefreshToken = null;
+        student.User.RefreshTokenExpiryTime = null;
+        await _userManager.UpdateAsync(student.User);
+
+        return ApiResponse<bool>.Ok(true, "La contraseña del estudiante fue actualizada exitosamente.");
+    }
+
     public async Task<ApiResponse<UserDto>> GetCurrentUserProfileAsync(Guid userId)
     {
         return await GetUserByIdAsync(userId);
