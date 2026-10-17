@@ -79,6 +79,10 @@ public class PedagogicalNoteService : IPedagogicalNoteService
 
         if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
         {
+            if (parsedDate.Date > DateTime.UtcNow.Date.AddDays(1))
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("La fecha de la observación pedagógica no puede ser una fecha futura.");
+            }
             note.FechaRegistro = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
         }
 
@@ -179,6 +183,10 @@ public class PedagogicalNoteService : IPedagogicalNoteService
         note.UpdatedAt = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
         {
+            if (parsedDate.Date > DateTime.UtcNow.Date.AddDays(1))
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("La fecha de la observación pedagógica no puede ser una fecha futura.");
+            }
             note.FechaRegistro = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
         }
 

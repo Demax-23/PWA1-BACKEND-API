@@ -116,6 +116,10 @@ public class ActivitiesController : BaseApiController
         var result = await _activityService.UpdateActivityAsync(id, userId.Value, dto, isAdmin);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("permisos", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return BadRequest(result);
         }
 
@@ -128,6 +132,7 @@ public class ActivitiesController : BaseApiController
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Docente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -141,6 +146,10 @@ public class ActivitiesController : BaseApiController
         var result = await _activityService.DeleteActivityAsync(id, userId.Value, isAdmin);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("permisos", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 
@@ -154,6 +163,7 @@ public class ActivitiesController : BaseApiController
     [Authorize(Roles = "Estudiante")]
     [ProducesResponseType(typeof(ApiResponse<StartActivityResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<StartActivityResponseDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<StartActivityResponseDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<StartActivityResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> StartActivity(Guid assignmentId)
     {
@@ -166,6 +176,10 @@ public class ActivitiesController : BaseApiController
         var result = await _executionService.StartActivityAsync(assignmentId, userId.Value);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return BadRequest(result);
         }
 
@@ -179,6 +193,7 @@ public class ActivitiesController : BaseApiController
     [Authorize(Roles = "Estudiante")]
     [ProducesResponseType(typeof(ApiResponse<ExecutionResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<ExecutionResultDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<ExecutionResultDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<ExecutionResultDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SubmitActivity(Guid assignmentId, [FromBody] SubmitActivityDto dto)
     {
@@ -200,6 +215,10 @@ public class ActivitiesController : BaseApiController
         var result = await _executionService.SubmitActivityAsync(assignmentId, userId.Value, dto);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return BadRequest(result);
         }
 

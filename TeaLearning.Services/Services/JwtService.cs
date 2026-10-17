@@ -26,7 +26,10 @@ public class JwtService : IJwtService
         Guid? acudienteId = null)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
-        var secretKey = jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!";
+        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
+            ? envSecretKey
+            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
         var durationMinutes = int.TryParse(jwtSettings["DurationInMinutes"], out var minutes) ? minutes : 60;
@@ -39,6 +42,7 @@ public class JwtService : IJwtService
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("security_stamp", user.SecurityStamp ?? string.Empty),
             new("nombreCompleto", user.NombreCompleto),
             new("nombres", user.Nombres),
             new("apellidos", user.Apellidos)
@@ -91,27 +95,46 @@ public class JwtService : IJwtService
 
     public ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
     {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
         var jwtSettings = _configuration.GetSection("Jwt");
-        var secretKey = jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!";
+        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
+            ? envSecretKey
+            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
+        var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
+        var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
         var tokenValidationParameters = new TokenValidationParameters
         {
-            ValidateAudience = false,
-            ValidateIssuer = false,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
             ValidateLifetime = false // Permitir tokens expirados para verificar firma
         };
 
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
 
-        if (securityToken is not JwtSecurityToken jwtSecurityToken ||
-            !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            if (securityToken is not JwtSecurityToken jwtSecurityToken ||
+                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return null;
+            }
+
+            return principal;
+        }
+        catch
         {
             return null;
         }
-
-        return principal;
     }
 }

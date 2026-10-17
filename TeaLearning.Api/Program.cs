@@ -15,23 +15,26 @@ var app = builder.Build();
 // Middleware global de excepciones estandarizadas
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Habilitar Swagger y Swagger UI
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Habilitar Swagger y Swagger UI únicamente en entorno de Desarrollo
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "TeaLearning API v1");
-    c.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TeaLearning API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
 
 app.UseHttpsRedirection();
 
 // Habilitar archivos estáticos (para avatares y recursos multimedia en wwwroot)
 app.UseStaticFiles();
 
-// Habilitar CORS
-app.UseCors("AllowAllPolicy");
+// Habilitar CORS restringido al Frontend autorizado
+app.UseCors("FrontendPolicy");
 
-// Limitación de solicitudes (restablecimiento de contraseña)
+// Limitación de solicitudes (autenticación y restablecimiento de contraseña)
 app.UseRateLimiter();
 
 // Autenticación y Autorización RBAC
@@ -41,19 +44,22 @@ app.UseAuthorization();
 // Mapeo de Controladores RESTful
 app.MapControllers();
 
-// Inicialización y Semillero de la Base de Datos
-try
+// Inicialización y Semillero de la Base de Datos (solo en Desarrollo o si se habilita explícitamente)
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SeedDatabaseOnStartup"))
 {
-    using var scope = app.Services.CreateScope();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    logger.LogInformation("Iniciando verificación y sembrado de la base de datos...");
-    await DatabaseSeeder.SeedAsync(app.Services);
-    logger.LogInformation("Base de datos y semillero inicializados correctamente.");
-}
-catch (Exception ex)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "Error al inicializar la base de datos y ejecutar el semillero.");
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Iniciando verificación y sembrado de la base de datos...");
+        await DatabaseSeeder.SeedAsync(app.Services);
+        logger.LogInformation("Base de datos y semillero inicializados correctamente.");
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error al inicializar la base de datos y ejecutar el semillero.");
+    }
 }
 
 app.Run();

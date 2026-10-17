@@ -21,12 +21,25 @@ public class SensoryPreferenceService : ISensoryPreferenceService
 
     public async Task<ApiResponse<SensoryPreferenceDto>> GetSensoryPreferencesByStudentIdAsync(
         Guid studentId, 
+        Guid? currentUserId = null,
+        bool isStaff = true,
         CancellationToken cancellationToken = default)
     {
-        var student = await _studentRepo.GetByIdAsync(studentId, cancellationToken);
+        var student = await _studentRepo.GetStudentWithDetailsAsync(studentId, cancellationToken)
+                      ?? await _studentRepo.GetByIdAsync(studentId, cancellationToken);
         if (student == null)
         {
             return ApiResponse<SensoryPreferenceDto>.Fail($"No se encontró el estudiante con identificador {studentId}.");
+        }
+
+        if (currentUserId.HasValue && !isStaff)
+        {
+            bool isOwnStudent = student.UserId == currentUserId.Value;
+            bool isLinkedGuardian = student.GuardianProfile != null && student.GuardianProfile.UserId == currentUserId.Value;
+            if (!isOwnStudent && !isLinkedGuardian)
+            {
+                return ApiResponse<SensoryPreferenceDto>.Fail("No tiene autorización para consultar las preferencias sensoriales de este estudiante.");
+            }
         }
 
         var pref = await _sensoryRepo.GetByStudentIdAsync(studentId, cancellationToken);
@@ -72,12 +85,23 @@ public class SensoryPreferenceService : ISensoryPreferenceService
     public async Task<ApiResponse<SensoryPreferenceDto>> UpdateSensoryPreferencesAsync(
         Guid studentId, 
         UpdateSensoryPreferenceDto dto, 
+        Guid? currentUserId = null,
+        bool isAdmin = true,
         CancellationToken cancellationToken = default)
     {
-        var student = await _studentRepo.GetByIdAsync(studentId, cancellationToken);
+        var student = await _studentRepo.GetStudentWithDetailsAsync(studentId, cancellationToken)
+                      ?? await _studentRepo.GetByIdAsync(studentId, cancellationToken);
         if (student == null)
         {
             return ApiResponse<SensoryPreferenceDto>.Fail($"No se encontró el estudiante con identificador {studentId}.");
+        }
+
+        if (currentUserId.HasValue && !isAdmin)
+        {
+            if (student.GuardianProfile == null || student.GuardianProfile.UserId != currentUserId.Value)
+            {
+                return ApiResponse<SensoryPreferenceDto>.Fail("No tiene autorización para modificar las preferencias sensoriales de este estudiante.");
+            }
         }
 
         var pref = await _sensoryRepo.GetByStudentIdAsync(studentId, cancellationToken);

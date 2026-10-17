@@ -10,11 +10,16 @@ public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    private readonly IHostEnvironment? _env;
 
-    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+    public ExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<ExceptionHandlingMiddleware> logger,
+        IHostEnvironment? env = null)
     {
         _next = next;
         _logger = logger;
+        _env = env;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -30,7 +35,7 @@ public class ExceptionHandlingMiddleware
         }
     }
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -46,10 +51,14 @@ public class ExceptionHandlingMiddleware
             Instance = context.Request.Path
         };
 
+        var showDetailedError = _env == null || _env.IsDevelopment();
+
         problemDetails.Extensions["traceId"] = traceId;
         problemDetails.Extensions["success"] = false;
         problemDetails.Extensions["message"] = "Ha ocurrido un error inesperado al procesar la solicitud.";
-        problemDetails.Extensions["errors"] = new[] { exception.Message };
+        problemDetails.Extensions["errors"] = showDetailedError
+            ? new[] { exception.Message }
+            : new[] { "Error interno del servidor. Consulte el traceId con soporte técnico." };
 
         var json = JsonSerializer.Serialize(problemDetails, new JsonSerializerOptions
         {

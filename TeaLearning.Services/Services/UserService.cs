@@ -159,6 +159,10 @@ public class UserService : IUserService
             return ApiResponse<UserDto>.Fail("Error al asignar nuevos roles", addResult.Errors.Select(e => e.Description).ToList());
         }
 
+        user.RefreshToken = null;
+        user.RefreshTokenExpiryTime = null;
+        await _userManager.UpdateSecurityStampAsync(user);
+
         var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
         var teacherProfile = await _context.TeacherProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
         var guardianProfile = await _context.GuardianProfiles.FirstOrDefaultAsync(g => g.UserId == user.Id);
@@ -220,8 +224,15 @@ public class UserService : IUserService
                 user.NormalizedUserName = _userManager.NormalizeName(normalizedEmail);
             }
         }
+        bool shouldRevokeSession = false;
         if (dto.IsActive.HasValue)
         {
+            if (!dto.IsActive.Value)
+            {
+                shouldRevokeSession = true;
+                user.RefreshToken = null;
+                user.RefreshTokenExpiryTime = null;
+            }
             user.IsActive = dto.IsActive.Value;
         }
 
@@ -253,6 +264,16 @@ public class UserService : IUserService
             {
                 return ApiResponse<UserDto>.Fail("Error al asignar los nuevos roles", addResult.Errors.Select(e => e.Description).ToList());
             }
+
+            shouldRevokeSession = true;
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = null;
+            await _userManager.UpdateAsync(user);
+        }
+
+        if (shouldRevokeSession)
+        {
+            await _userManager.UpdateSecurityStampAsync(user);
         }
 
         var finalRoles = await _userManager.GetRolesAsync(user);

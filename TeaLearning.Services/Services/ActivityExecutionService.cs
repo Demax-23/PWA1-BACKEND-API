@@ -108,6 +108,12 @@ public class ActivityExecutionService : IActivityExecutionService
             return ApiResponse<ExecutionResultDto>.Fail("No tiene autorización para enviar resultados de una asignación que no le corresponde.");
         }
 
+        // 2.1 Validar coherencia de telemetría (no permitir marcar como completada exitosamente con 0 aciertos)
+        if (dto.CompletadaExitosamente && dto.CantidadAciertos <= 0)
+        {
+            return ApiResponse<ExecutionResultDto>.Fail("Para marcar una actividad como completada exitosamente se requiere al menos 1 acierto.");
+        }
+
         // 3. Registrar telemetría del intento / ejecución en ActivityExecution
         var execution = new ActivityExecution
         {

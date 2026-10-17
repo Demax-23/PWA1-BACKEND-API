@@ -197,11 +197,27 @@ public class ActivityService : IActivityService
 
     private static bool IsValidJson(string strInput)
     {
-        if (string.IsNullOrWhiteSpace(strInput)) return false;
+        if (string.IsNullOrWhiteSpace(strInput) || strInput.Length > 16384)
+        {
+            return false;
+        }
+
+        string[] dangerousPatterns = ["<script", "javascript:", "onerror=", "onload=", "<iframe", "vbscript:", "data:text/html"];
+        foreach (var pattern in dangerousPatterns)
+        {
+            if (strInput.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
         try
         {
-            using var doc = JsonDocument.Parse(strInput);
-            return true;
+            using var doc = JsonDocument.Parse(strInput, new JsonDocumentOptions
+            {
+                MaxDepth = 8
+            });
+            return doc.RootElement.ValueKind == JsonValueKind.Object;
         }
         catch (JsonException)
         {

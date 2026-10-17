@@ -7,7 +7,6 @@ using TeaLearning.Services.Interfaces;
 
 namespace TeaLearning.Api.Controllers;
 
-[AllowAnonymous]
 public class AuthController : BaseApiController
 {
     private readonly IAuthService _authService;
@@ -20,11 +19,14 @@ public class AuthController : BaseApiController
     }
 
     /// <summary>
-    /// Registra un nuevo usuario en la plataforma con su rol asignado.
+    /// Registra un nuevo usuario en la plataforma con su rol asignado (Exclusivo Administrador - HU-001).
     /// </summary>
     [HttpPost("register")]
+    [Authorize(Roles = "Administrador")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Register([FromBody] RegisterRequestDto dto)
     {
         if (!ModelState.IsValid)
@@ -49,8 +51,11 @@ public class AuthController : BaseApiController
     /// Inicia sesión con correo electrónico y contraseña generando JWT y Refresh Token.
     /// </summary>
     [HttpPost("login")]
+    [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
         if (!ModelState.IsValid)
@@ -75,8 +80,11 @@ public class AuthController : BaseApiController
     /// Renueva el token de acceso utilizando un refresh token válido.
     /// </summary>
     [HttpPost("refresh-token")]
+    [AllowAnonymous]
+    [EnableRateLimiting("refresh-token")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto dto)
     {
         if (!ModelState.IsValid)
@@ -98,6 +106,7 @@ public class AuthController : BaseApiController
     /// Responde siempre igual, exista o no la cuenta, para no revelar qué correos están registrados.
     /// </summary>
     [HttpPost("forgot-password")]
+    [AllowAnonymous]
     [EnableRateLimiting("password-reset-request")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]
@@ -121,6 +130,7 @@ public class AuthController : BaseApiController
     /// Define una nueva contraseña usando el token recibido por correo. El token es de un solo uso y de vigencia corta.
     /// </summary>
     [HttpPost("reset-password")]
+    [AllowAnonymous]
     [EnableRateLimiting("password-reset-confirm")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]

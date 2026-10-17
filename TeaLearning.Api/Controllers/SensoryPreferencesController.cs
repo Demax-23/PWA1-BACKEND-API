@@ -22,12 +22,24 @@ public class SensoryPreferencesController : BaseApiController
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPreferences(Guid id)
     {
-        var result = await _sensoryService.GetSensoryPreferencesByStudentIdAsync(id);
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<SensoryPreferenceDto>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        bool isStaff = User.IsInRole("Administrador") || User.IsInRole("Docente");
+        var result = await _sensoryService.GetSensoryPreferencesByStudentIdAsync(id, userId.Value, isStaff);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 
@@ -35,15 +47,22 @@ public class SensoryPreferencesController : BaseApiController
     }
 
     /// <summary>
-    /// Actualiza la configuración sensorial adaptativa (paleta, tipografía, audio, animaciones, contraste, etc.) (Restringido a Acudiente o Administrador - HU-003).
+    /// Actualiza la configuración sensorial adaptativa (paleta, tipografía, audio, animaciones, contraste, etc.) (Restringido a Acudiente titular o Administrador - HU-003).
     /// </summary>
     [HttpPut]
     [Authorize(Roles = "Acudiente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<SensoryPreferenceDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdatePreferences(Guid id, [FromBody] UpdateSensoryPreferenceDto dto)
     {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<SensoryPreferenceDto>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values
@@ -53,9 +72,18 @@ public class SensoryPreferencesController : BaseApiController
             return BadRequest(ApiResponse<SensoryPreferenceDto>.Fail("Datos sensoriales inválidos", errors));
         }
 
-        var result = await _sensoryService.UpdateSensoryPreferencesAsync(id, dto);
+        bool isAdmin = User.IsInRole("Administrador");
+        var result = await _sensoryService.UpdateSensoryPreferencesAsync(id, dto, userId.Value, isAdmin);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
+            if (result.Message != null && result.Message.Contains("No se encontró", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(result);
+            }
             return BadRequest(result);
         }
 

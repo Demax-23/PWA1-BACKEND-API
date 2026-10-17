@@ -50,12 +50,26 @@ public class AssignmentsController : BaseApiController
     [HttpGet]
     [Authorize(Roles = "Docente,Administrador,Acudiente")]
     [ProducesResponseType(typeof(ApiResponse<List<AssignmentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<AssignmentDto>>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? studentProfileId = null,
         [FromQuery] Guid? classroomId = null,
         [FromQuery] EstadoAsignacion? estado = null)
     {
-        var result = await _assignmentService.GetAssignmentsAsync(studentProfileId, classroomId, estado);
+        var userId = GetCurrentUserId();
+        bool isStaff = User.IsInRole("Administrador") || User.IsInRole("Docente");
+        bool isGuardianOnly = !isStaff && User.IsInRole("Acudiente");
+
+        var result = await _assignmentService.GetAssignmentsAsync(studentProfileId, classroomId, estado, userId, isGuardianOnly);
+        if (!result.Success)
+        {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
+            return NotFound(result);
+        }
+
         return Ok(result);
     }
 
@@ -64,12 +78,20 @@ public class AssignmentsController : BaseApiController
     /// </summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<AssignmentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AssignmentDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<AssignmentDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var result = await _assignmentService.GetAssignmentByIdAsync(id);
+        var userId = GetCurrentUserId();
+        bool isStaff = User.IsInRole("Administrador") || User.IsInRole("Docente");
+
+        var result = await _assignmentService.GetAssignmentByIdAsync(id, userId, isStaff);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 
@@ -82,12 +104,20 @@ public class AssignmentsController : BaseApiController
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Docente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var result = await _assignmentService.DeleteAssignmentAsync(id);
+        var userId = GetCurrentUserId();
+        bool isAdmin = User.IsInRole("Administrador");
+
+        var result = await _assignmentService.DeleteAssignmentAsync(id, userId, isAdmin);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 
@@ -101,6 +131,7 @@ public class AssignmentsController : BaseApiController
     [Authorize(Roles = "Docente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<AssignmentGradeDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Grade(Guid id, [FromBody] GradeAssignmentDto dto, CancellationToken cancellationToken)
     {
@@ -119,9 +150,14 @@ public class AssignmentsController : BaseApiController
             return Unauthorized(ApiResponse<AssignmentGradeDto>.Fail("No se pudo identificar al usuario autenticado."));
         }
 
-        var result = await _assignmentService.GradeAssignmentAsync(id, userId.Value, dto, cancellationToken);
+        bool isAdmin = User.IsInRole("Administrador");
+        var result = await _assignmentService.GradeAssignmentAsync(id, userId.Value, dto, isAdmin, cancellationToken);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 
@@ -134,6 +170,7 @@ public class AssignmentsController : BaseApiController
     [HttpDelete("{id:guid}/grade")]
     [Authorize(Roles = "Docente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveGrade(Guid id, CancellationToken cancellationToken)
     {
@@ -143,9 +180,14 @@ public class AssignmentsController : BaseApiController
             return Unauthorized(ApiResponse<bool>.Fail("No se pudo identificar al usuario autenticado."));
         }
 
-        var result = await _assignmentService.RemoveGradeAsync(id, userId.Value, cancellationToken);
+        bool isAdmin = User.IsInRole("Administrador");
+        var result = await _assignmentService.RemoveGradeAsync(id, userId.Value, isAdmin, cancellationToken);
         if (!result.Success)
         {
+            if (result.Message != null && result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            }
             return NotFound(result);
         }
 

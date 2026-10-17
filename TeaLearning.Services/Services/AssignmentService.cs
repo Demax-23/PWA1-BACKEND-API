@@ -167,14 +167,43 @@ public class AssignmentService : IAssignmentService
         Guid? studentProfileId = null, 
         Guid? classroomId = null, 
         EstadoAsignacion? estado = null, 
+        Guid? currentUserId = null,
+        bool isGuardianOnly = false,
         CancellationToken cancellationToken = default)
     {
+        if (isGuardianOnly && currentUserId.HasValue)
+        {
+            if (studentProfileId.HasValue)
+            {
+                var student = await _studentRepository.GetStudentWithDetailsAsync(studentProfileId.Value, cancellationToken);
+                if (student == null)
+                {
+                    return ApiResponse<List<AssignmentDto>>.Fail($"El estudiante con ID {studentProfileId.Value} no existe.");
+                }
+                if (student.GuardianProfile == null || student.GuardianProfile.UserId != currentUserId.Value)
+                {
+                    return ApiResponse<List<AssignmentDto>>.Fail("No tiene autorización para consultar las asignaciones de este estudiante.");
+                }
+            }
+
+            var allFiltered = await _assignmentRepository.GetFilteredAsync(studentProfileId, classroomId, estado, cancellationToken);
+            var guardianFiltered = allFiltered
+                .Where(a => a.StudentProfile?.GuardianProfile != null && a.StudentProfile.GuardianProfile.UserId == currentUserId.Value)
+                .Select(MapToDto)
+                .ToList();
+            return ApiResponse<List<AssignmentDto>>.Ok(guardianFiltered, $"Se recuperaron {guardianFiltered.Count} asignaciones");
+        }
+
         var assignments = await _assignmentRepository.GetFilteredAsync(studentProfileId, classroomId, estado, cancellationToken);
         var dtoList = assignments.Select(MapToDto).ToList();
         return ApiResponse<List<AssignmentDto>>.Ok(dtoList, $"Se recuperaron {dtoList.Count} asignaciones");
     }
 
-    public async Task<ApiResponse<AssignmentDto>> GetAssignmentByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ApiResponse<AssignmentDto>> GetAssignmentByIdAsync(
+        Guid id, 
+        Guid? currentUserId = null,
+        bool isStaff = true,
+        CancellationToken cancellationToken = default)
     {
         var assignment = await _assignmentRepository.GetWithDetailsAsync(id, cancellationToken);
         if (assignment == null)
@@ -182,15 +211,48 @@ public class AssignmentService : IAssignmentService
             return ApiResponse<AssignmentDto>.Fail($"Asignación con ID {id} no encontrada.");
         }
 
+        if (!isStaff && currentUserId.HasValue)
+        {
+            bool isOwnStudent = assignment.StudentProfile?.UserId == currentUserId.Value;
+            bool isLinkedGuardian = assignment.StudentProfile?.GuardianProfile != null &&
+                                    assignment.StudentProfile.GuardianProfile.UserId == currentUserId.Value;
+            if (!isOwnStudent && !isLinkedGuardian)
+            {
+                return ApiResponse<AssignmentDto>.Fail("No tiene autorización para consultar esta asignación.");
+            }
+        }
+
         return ApiResponse<AssignmentDto>.Ok(MapToDto(assignment), "Asignación recuperada con éxito");
     }
 
-    public async Task<ApiResponse<bool>> DeleteAssignmentAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ApiResponse<bool>> DeleteAssignmentAsync(
+        Guid id, 
+        Guid? currentUserId = null,
+        bool isAdmin = true,
+        CancellationToken cancellationToken = default)
     {
-        var assignment = await _assignmentRepository.GetByIdAsync(id, cancellationToken);
+        var assignment = await _assignmentRepository.GetWithDetailsAsync(id, cancellationToken)
+                         ?? await _assignmentRepository.GetByIdAsync(id, cancellationToken);
         if (assignment == null)
         {
             return ApiResponse<bool>.Fail($"Asignación con ID {id} no encontrada.");
+        }
+
+        if (!isAdmin && currentUserId.HasValue)
+        {
+            var teacher = await _context.TeacherProfiles
+                .FirstOrDefaultAsync(t => t.UserId == currentUserId.Value && t.IsActive, cancellationToken);
+
+            if (teacher != null && assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
+            {
+                bool isActivityOwner = assignment.Activity.DocenteId == teacher.Id;
+                bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
+                                        assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+                if (!isActivityOwner && !isClassroomOwner)
+                {
+                    return ApiResponse<bool>.Fail("No tiene autorización para eliminar una asignación perteneciente a otro docente.");
+                }
+            }
         }
 
         await _assignmentRepository.DeleteAsync(assignment, cancellationToken);
@@ -201,6 +263,7 @@ public class AssignmentService : IAssignmentService
         Guid assignmentId, 
         Guid currentUserId, 
         GradeAssignmentDto dto, 
+        bool isAdmin = false,
         CancellationToken cancellationToken = default)
     {
         var assignment = await _assignmentRepository.GetWithDetailsAsync(assignmentId, cancellationToken);
@@ -212,6 +275,17 @@ public class AssignmentService : IAssignmentService
         var teacher = await _context.TeacherProfiles
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.IsActive, cancellationToken);
+
+        if (!isAdmin && teacher != null && assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
+        {
+            bool isActivityOwner = assignment.Activity.DocenteId == teacher.Id;
+            bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
+                                    assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+            if (!isActivityOwner && !isClassroomOwner)
+            {
+                return ApiResponse<AssignmentGradeDto>.Fail("No tiene autorización para calificar una asignación perteneciente a otro docente.");
+            }
+        }
 
         var currentUser = await _context.Users
             .FirstOrDefaultAsync(u => u.Id == currentUserId, cancellationToken);
@@ -235,12 +309,33 @@ public class AssignmentService : IAssignmentService
     public async Task<ApiResponse<bool>> RemoveGradeAsync(
         Guid assignmentId, 
         Guid currentUserId, 
+        bool isAdmin = false,
         CancellationToken cancellationToken = default)
     {
-        var assignment = await _assignmentRepository.GetByIdAsync(assignmentId, cancellationToken);
+        var assignment = await _assignmentRepository.GetWithDetailsAsync(assignmentId, cancellationToken)
+                         ?? await _assignmentRepository.GetByIdAsync(assignmentId, cancellationToken);
         if (assignment == null)
         {
             return ApiResponse<bool>.Fail($"La asignación con ID {assignmentId} no existe.");
+        }
+
+        if (!isAdmin)
+        {
+            var teacher = await _context.TeacherProfiles
+                .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.IsActive, cancellationToken);
+
+            if (teacher != null)
+            {
+                bool isActivityOwner = assignment.Activity == null || assignment.Activity.DocenteId == Guid.Empty || assignment.Activity.DocenteId == teacher.Id;
+                bool isGraderOwner = !assignment.CalificadoPorDocenteId.HasValue || assignment.CalificadoPorDocenteId.Value == teacher.Id;
+                bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
+                                        assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+
+                if (!isActivityOwner && !isGraderOwner && !isClassroomOwner)
+                {
+                    return ApiResponse<bool>.Fail("No tiene autorización para eliminar la calificación registrada por otro docente.");
+                }
+            }
         }
 
         assignment.Calificacion = null;

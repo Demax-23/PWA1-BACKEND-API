@@ -21,6 +21,7 @@ public class CreateActivityDto
     public string ObjetivoPedagogico { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "La estructura dinámica de configuración JSON es obligatoria")]
+    [MaxLength(16384, ErrorMessage = "La estructura ConfigJson no puede superar los 16 KB (16384 caracteres)")]
     public string ConfigJson { get; set; } = "{}";
 
     [Required(ErrorMessage = "El identificador del módulo temático es obligatorio")]

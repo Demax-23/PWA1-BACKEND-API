@@ -302,6 +302,14 @@ public class AuthService : IAuthService
             return ApiResponse<AuthResponseDto>.Fail("Usuario no encontrado o inactivo.");
         }
 
+        var tokenSecurityStamp = principal.FindFirst("security_stamp")?.Value;
+        if (!string.IsNullOrEmpty(tokenSecurityStamp) &&
+            !string.IsNullOrEmpty(user.SecurityStamp) &&
+            !string.Equals(tokenSecurityStamp, user.SecurityStamp, StringComparison.Ordinal))
+        {
+            return ApiResponse<AuthResponseDto>.Fail("La sesión ha sido invalidada por un cambio de seguridad. Por favor inicie sesión nuevamente.");
+        }
+
         if (user.RefreshToken != dto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
             return ApiResponse<AuthResponseDto>.Fail("El token de actualización ha expirado o no es válido.");

@@ -52,7 +52,10 @@ public static class ServiceCollectionExtensions
 
         // 3. Configuración de Autenticación JWT
         var jwtSettings = configuration.GetSection("Jwt");
-        var secretKey = jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!";
+        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
+            ? envSecretKey
+            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
@@ -114,33 +117,50 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
 
-        // 5.2 Limitación de solicitudes por IP para evitar abuso del envío de correos y fuerza bruta sobre el token
+        // 5.2 Limitación de solicitudes por IP para evitar abuso del envío de correos y fuerza bruta sobre autenticación y tokens
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-            static RateLimitPartition<string> PerIp(HttpContext context, int permitLimit) =>
+            static RateLimitPartition<string> PerIp(HttpContext context, int permitLimit, int windowMinutes = 15) =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = permitLimit,
-                        Window = TimeSpan.FromMinutes(15),
+                        Window = TimeSpan.FromMinutes(windowMinutes),
                         QueueLimit = 0
                     });
 
-            options.AddPolicy("password-reset-request", context => PerIp(context, 5));
-            options.AddPolicy("password-reset-confirm", context => PerIp(context, 10));
+            options.AddPolicy("password-reset-request", context => PerIp(context, 5, 15));
+            options.AddPolicy("password-reset-confirm", context => PerIp(context, 10, 15));
+            options.AddPolicy("login", context => PerIp(context, 10, 5));
+            options.AddPolicy("refresh-token", context => PerIp(context, 30, 5));
         });
 
-        // 6. Configuración de CORS
+        // 6. Configuración de CORS restringida a orígenes confiables del Frontend
+        var configuredOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        var frontendBaseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:5500";
+        var allowedOrigins = (configuredOrigins != null && configuredOrigins.Length > 0)
+            ? configuredOrigins
+            : new[] { frontendBaseUrl.TrimEnd('/'), "http://localhost:5500", "http://127.0.0.1:5500" };
+
         services.AddCors(options =>
         {
+            options.AddPolicy("FrontendPolicy", builder =>
+            {
+                builder.WithOrigins(allowedOrigins.Distinct().ToArray())
+                       .AllowAnyMethod()
+                       .AllowAnyHeader()
+                       .AllowCredentials();
+            });
+
             options.AddPolicy("AllowAllPolicy", builder =>
             {
-                builder.AllowAnyOrigin()
+                builder.WithOrigins(allowedOrigins.Distinct().ToArray())
                        .AllowAnyMethod()
-                       .AllowAnyHeader();
+                       .AllowAnyHeader()
+                       .AllowCredentials();
             });
         });
 
