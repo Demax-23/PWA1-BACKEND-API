@@ -1,6 +1,8 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +22,27 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // 1. Configuración de Base de Datos SQL Server
+        // 0. Configuración de Proxy Inverso (Azure App Service / Cloudflare) para preservar IP real y esquema HTTPS
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.KnownNetworks.Clear();
+            options.KnownProxies.Clear();
+        });
+
+        // 1. Configuración de Base de Datos SQL Server / Azure SQL con resiliencia ante fallos transitorios
         var connectionString = configuration.GetConnectionString("DefaultConnection") 
             ?? "Server=(localdb)\\mssqllocaldb;Database=TeaLearningDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(connectionString, b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+            options.UseSqlServer(connectionString, sqlOptions =>
+            {
+                sqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorNumbersToAdd: null);
+            }));
 
         // 2. Configuración de ASP.NET Core Identity con Guid
         services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -50,12 +67,17 @@ public static class ServiceCollectionExtensions
         // 2.1 Reemplazo del algoritmo hash predeterminado (PBKDF2/SHA256) por BCrypt
         services.AddScoped<IPasswordHasher<ApplicationUser>, BcryptPasswordHasher>();
 
-        // 3. Configuración de Autenticación JWT
+        // 3. Configuración de Autenticación JWT (soporta TEA_JWT_SECRET_KEY, Jwt:Key y Jwt:SecretKey)
         var jwtSettings = configuration.GetSection("Jwt");
         var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
+            ? jwtSettings["Key"]
+            : jwtSettings["SecretKey"];
         var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
             ? envSecretKey
-            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
+            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
+                ? configuredJwtKey
+                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
@@ -117,14 +139,28 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
 
-        // 5.2 Limitación de solicitudes por IP para evitar abuso del envío de correos y fuerza bruta sobre autenticación y tokens
+        // 5.2 Limitación de solicitudes por IP real (compatible con ForwardedHeaders en Azure App Service)
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+            static string ResolveClientIp(HttpContext context)
+            {
+                var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(forwardedFor))
+                {
+                    var firstIp = forwardedFor.Split(',')[0].Trim();
+                    if (!string.IsNullOrWhiteSpace(firstIp))
+                    {
+                        return firstIp;
+                    }
+                }
+                return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            }
+
             static RateLimitPartition<string> PerIp(HttpContext context, int permitLimit, int windowMinutes = 15) =>
                 RateLimitPartition.GetFixedWindowLimiter(
-                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    ResolveClientIp(context),
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = permitLimit,
@@ -138,28 +174,64 @@ public static class ServiceCollectionExtensions
             options.AddPolicy("refresh-token", context => PerIp(context, 30, 5));
         });
 
-        // 6. Configuración de CORS restringida a orígenes confiables del Frontend
-        var configuredOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
-        var frontendBaseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:5500";
-        var allowedOrigins = (configuredOrigins != null && configuredOrigins.Length > 0)
-            ? configuredOrigins
-            : new[] { frontendBaseUrl.TrimEnd('/'), "http://localhost:5500", "http://127.0.0.1:5500" };
+        // 6. Configuración de CORS dinámica (soporta Array JSON o String separado por comas desde Azure App Service + Localhost)
+        var originsList = new List<string>
+        {
+            "http://localhost:5500",
+            "http://127.0.0.1:5500"
+        };
+
+        var frontendBaseUrl = configuration["Frontend:BaseUrl"];
+        if (!string.IsNullOrWhiteSpace(frontendBaseUrl))
+        {
+            originsList.Add(frontendBaseUrl.Trim().TrimEnd('/'));
+        }
+
+        var arrayOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        if (arrayOrigins != null && arrayOrigins.Length > 0)
+        {
+            foreach (var o in arrayOrigins)
+            {
+                if (!string.IsNullOrWhiteSpace(o))
+                {
+                    foreach (var splitOrigin in o.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        originsList.Add(splitOrigin.TrimEnd('/'));
+                    }
+                }
+            }
+        }
+
+        var rawOriginsString = configuration["Cors:AllowedOrigins"];
+        if (!string.IsNullOrWhiteSpace(rawOriginsString))
+        {
+            foreach (var splitOrigin in rawOriginsString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                originsList.Add(splitOrigin.TrimEnd('/'));
+            }
+        }
+
+        var finalAllowedOrigins = originsList
+            .Where(o => !string.IsNullOrWhiteSpace(o) && !o.Contains('<') && !o.Contains('>'))
+            .Select(o => o.TrimEnd('/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         services.AddCors(options =>
         {
             options.AddPolicy("FrontendPolicy", builder =>
             {
-                builder.WithOrigins(allowedOrigins.Distinct().ToArray())
-                       .AllowAnyMethod()
-                       .AllowAnyHeader()
+                builder.WithOrigins(finalAllowedOrigins)
+                       .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                       .WithHeaders("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With")
                        .AllowCredentials();
             });
 
             options.AddPolicy("AllowAllPolicy", builder =>
             {
-                builder.WithOrigins(allowedOrigins.Distinct().ToArray())
-                       .AllowAnyMethod()
-                       .AllowAnyHeader()
+                builder.WithOrigins(finalAllowedOrigins)
+                       .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                       .WithHeaders("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With")
                        .AllowCredentials();
             });
         });

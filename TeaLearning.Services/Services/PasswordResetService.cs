@@ -51,7 +51,8 @@ public class PasswordResetService : IPasswordResetService
         try
         {
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var baseUrl = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:5500").TrimEnd('/');
+            var configuredBaseUrl = _configuration["Frontend:BaseUrl"];
+            var baseUrl = (!string.IsNullOrWhiteSpace(configuredBaseUrl) ? configuredBaseUrl : "http://127.0.0.1:5500").Trim().TrimEnd('/');
 
             // El token va en el fragmento (#): el navegador nunca lo envía al servidor ni queda en logs o cabeceras Referer.
             var link = $"{baseUrl}/reset-password.html#email={Uri.EscapeDataString(user.Email!)}&token={Base64Url.Encode(token)}";

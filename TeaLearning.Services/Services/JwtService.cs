@@ -27,9 +27,14 @@ public class JwtService : IJwtService
     {
         var jwtSettings = _configuration.GetSection("Jwt");
         var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
+            ? jwtSettings["Key"]
+            : jwtSettings["SecretKey"];
         var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
             ? envSecretKey
-            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
+            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
+                ? configuredJwtKey
+                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
         var durationMinutes = int.TryParse(jwtSettings["DurationInMinutes"], out var minutes) ? minutes : 60;
@@ -102,9 +107,14 @@ public class JwtService : IJwtService
 
         var jwtSettings = _configuration.GetSection("Jwt");
         var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
+        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
+            ? jwtSettings["Key"]
+            : jwtSettings["SecretKey"];
         var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
             ? envSecretKey
-            : (jwtSettings["SecretKey"] ?? "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
+            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
+                ? configuredJwtKey
+                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
