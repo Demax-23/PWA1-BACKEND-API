@@ -24,16 +24,19 @@ jobs:
           dotnet-version: '9.x'
 
       - name: Build with dotnet
-        run: dotnet build --configuration Release
+        run: dotnet build TeaLearning.Api/TeaLearning.Api.csproj -c Release
 
       - name: dotnet publish
-        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+        run: dotnet publish TeaLearning.Api/TeaLearning.Api.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+
+      - name: Package release.zip
+        run: cd ${{env.DOTNET_ROOT}}/myapp && zip -r release.zip .
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          path: ${{env.DOTNET_ROOT}}/myapp/release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,7 +50,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
-      
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -61,5 +64,5 @@ jobs:
         with:
           app-name: 'tealearning-api'
           slot-name: 'Production'
-          package: .
-          
+          package: release.zip
+          clean: true

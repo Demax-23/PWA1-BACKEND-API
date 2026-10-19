@@ -60,28 +60,37 @@ app.MapGet("/api/health", () => Results.Ok(new
 // Mapeo de Controladores RESTful
 app.MapControllers();
 
-// Auto-Migración Segura y Semillero Idempotente (LocalDB y Azure SQL Database)
-try
+// Auto-Migración Segura y Semillero Idempotente en segundo plano tras iniciar Kestrel
+// Garantiza que app.Run() abra el puerto HTTP de inmediato para el Health Check de Azure App Service
+var seedOnStartup = builder.Configuration.GetValue<bool>("SeedDatabaseOnStartup", true);
+app.Lifetime.ApplicationStarted.Register(() =>
 {
-    using var scope = app.Services.CreateScope();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    logger.LogInformation("Aplicando migraciones pendientes en SQL Server / Azure SQL...");
-    await dbContext.Database.MigrateAsync();
-
-    if (builder.Configuration.GetValue<bool>("SeedDatabaseOnStartup", true))
+    _ = Task.Run(async () =>
     {
-        logger.LogInformation("Ejecutando semillero idempotente de roles y cuentas base...");
-        await DatabaseSeeder.SeedAsync(app.Services);
-    }
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    logger.LogInformation("Base de datos y semillero inicializados correctamente.");
-}
-catch (Exception ex)
-{
-    var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(ex, "Error al aplicar migraciones o ejecutar el semillero en el arranque.");
-}
+            logger.LogInformation("Aplicando migraciones pendientes en SQL Server / Azure SQL en segundo plano...");
+            await dbContext.Database.MigrateAsync();
+
+            if (seedOnStartup)
+            {
+                logger.LogInformation("Ejecutando semillero idempotente de roles y cuentas base...");
+                await DatabaseSeeder.SeedAsync(app.Services);
+            }
+
+            logger.LogInformation("Base de datos y semillero inicializados correctamente.");
+        }
+        catch (Exception ex)
+        {
+            using var errScope = app.Services.CreateScope();
+            var logger = errScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "Error al aplicar migraciones o ejecutar el semillero en segundo plano.");
+        }
+    });
+});
 
 app.Run();
