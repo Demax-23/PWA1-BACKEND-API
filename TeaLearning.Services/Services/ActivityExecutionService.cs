@@ -54,6 +54,12 @@ public class ActivityExecutionService : IActivityExecutionService
         var sensoryPref = assignment.StudentProfile.SensoryPreference;
         if (sensoryPref != null)
         {
+            var resolvedMode = sensoryPref.OcultarTemporizadores
+                ? "sin-temporizador"
+                : (!string.IsNullOrWhiteSpace(sensoryPref.ModoTemporizador) && sensoryPref.ModoTemporizador != "sin-temporizador"
+                    ? sensoryPref.ModoTemporizador
+                    : "tiempo-extendido");
+
             sensoryDto = new SensoryPreferenceDto
             {
                 Id = sensoryPref.Id,
@@ -67,7 +73,9 @@ public class ActivityExecutionService : IActivityExecutionService
                 AnimacionesReducidas = sensoryPref.AnimacionesReducidas,
                 NivelEscalaFuente = sensoryPref.NivelEscalaFuente,
                 ModoContraste = sensoryPref.ModoContraste,
-                OcultarTemporizadores = sensoryPref.OcultarTemporizadores
+                OcultarTemporizadores = sensoryPref.OcultarTemporizadores,
+                ModoTemporizador = resolvedMode,
+                SegundosAvisoPrevio = Math.Clamp(sensoryPref.SegundosAvisoPrevio, 0, 60)
             };
         }
 

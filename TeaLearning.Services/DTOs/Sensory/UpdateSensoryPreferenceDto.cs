@@ -29,5 +29,12 @@ public class UpdateSensoryPreferenceDto
 
     public bool OcultarTemporizadores { get; set; }
 
+    [MaxLength(30, ErrorMessage = "El modo de temporizador no puede exceder los 30 caracteres")]
+    [RegularExpression(@"^(sin-temporizador|tiempo-extendido|estandar)$", ErrorMessage = "Modo de temporizador inválido")]
+    public string? ModoTemporizador { get; set; }
+
+    [Range(0, 60, ErrorMessage = "Los segundos de aviso previo deben estar entre 0 y 60")]
+    public int? SegundosAvisoPrevio { get; set; }
+
     public bool MayorEspacioEntreLetras { get; set; }
 }

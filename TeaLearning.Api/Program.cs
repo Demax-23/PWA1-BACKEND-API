@@ -1,13 +1,35 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using TeaLearning.Api.Converters;
 using TeaLearning.Api.Extensions;
 using TeaLearning.Api.Middlewares;
 using TeaLearning.Data.Context;
 using TeaLearning.Data.Seeders;
+using TeaLearning.Services.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar controladores de API
-builder.Services.AddControllers();
+// Configurar controladores de API con respuesta de validación unificada (ApiResponse) y soporte decimal flexible ('.' y ',')
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new FlexibleDecimalJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new FlexibleNullableDecimalJsonConverter());
+    })
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Valor de entrada inválido." : e.ErrorMessage)
+                .Distinct()
+                .ToList();
+
+            var message = errors.Count > 0 ? errors[0] : "Datos de entrada inválidos.";
+            return new BadRequestObjectResult(ApiResponse<object>.Fail(message, errors));
+        };
+    });
 
 // Configurar capas de infraestructura, base de datos, JWT, Identity y Swagger
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -46,16 +68,33 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Compuerta de sincronización: permite que Kestrel abra el puerto de inmediato para el Health Check de Azure App Service
+// mientras encola de forma segura las peticiones /api/* (salvo /api/health) hasta finalizar migraciones y semillero.
+var dbInitializationTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
 // Endpoint ligero de salud para el sondeo Always On de Azure App Service
 app.MapGet("/api/health", () => Results.Ok(new
 {
     status = "Healthy",
+    databaseInitialized = dbInitializationTcs.Task.IsCompleted,
     service = "TeaLearning.Api",
     environment = app.Environment.EnvironmentName,
     timestamp = DateTime.UtcNow
 }))
 .AllowAnonymous()
 .DisableRateLimiting();
+
+app.Use(async (context, next) =>
+{
+    if (!dbInitializationTcs.Task.IsCompleted &&
+        context.Request.Path.StartsWithSegments("/api") &&
+        !context.Request.Path.StartsWithSegments("/api/health"))
+    {
+        await Task.WhenAny(dbInitializationTcs.Task, Task.Delay(TimeSpan.FromSeconds(45), context.RequestAborted));
+    }
+
+    await next();
+});
 
 // Mapeo de Controladores RESTful
 app.MapControllers();
@@ -89,6 +128,10 @@ app.Lifetime.ApplicationStarted.Register(() =>
             using var errScope = app.Services.CreateScope();
             var logger = errScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
             logger.LogError(ex, "Error al aplicar migraciones o ejecutar el semillero en segundo plano.");
+        }
+        finally
+        {
+            dbInitializationTcs.TrySetResult(true);
         }
     });
 });

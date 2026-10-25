@@ -47,7 +47,7 @@ public class GuardianController : BaseApiController
         var result = await _guardianService.GetStudentProgressAsync(studentId, currentUserId.Value, isAdmin, cancellationToken);
         if (!result.Success)
         {
-            if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            if ((result.Message ?? string.Empty).Contains("autorización", StringComparison.OrdinalIgnoreCase))
             {
                 return StatusCode(StatusCodes.Status403Forbidden, result);
             }
@@ -132,11 +132,11 @@ public class GuardianController : BaseApiController
     }
 
     /// <summary>
-    /// Restablece la contraseña de un estudiante vinculado. Solo el acudiente titular puede hacerlo.
+    /// Restablece la contraseña de un estudiante vinculado. Accesible para el acudiente titular o Administrador.
     /// La nueva contraseña debe cumplir la política de Identity (mínimo 6 caracteres y 1 dígito).
     /// </summary>
     [HttpPost("students/{studentId:guid}/reset-password")]
-    [Authorize(Roles = "Acudiente")]
+    [Authorize(Roles = "Acudiente,Administrador")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status401Unauthorized)]
@@ -161,14 +161,16 @@ public class GuardianController : BaseApiController
             return Unauthorized(ApiResponse<bool>.Fail("No se pudo identificar al usuario autenticado."));
         }
 
-        var result = await _userService.ResetStudentPasswordAsync(currentUserId.Value, studentId, dto.NewPassword);
+        bool isAdmin = User.IsInRole("Administrador");
+        var result = await _userService.ResetStudentPasswordAsync(currentUserId.Value, studentId, dto.NewPassword, isAdmin);
         if (!result.Success)
         {
-            if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            var msg = result.Message ?? string.Empty;
+            if (msg.Contains("autorización", StringComparison.OrdinalIgnoreCase))
             {
                 return StatusCode(StatusCodes.Status403Forbidden, result);
             }
-            if (result.Message.Contains("no encontrado", StringComparison.OrdinalIgnoreCase))
+            if (msg.Contains("no encontrado", StringComparison.OrdinalIgnoreCase))
             {
                 return NotFound(result);
             }

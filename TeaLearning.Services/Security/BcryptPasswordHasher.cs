@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using TeaLearning.Core.Entities;
@@ -33,6 +34,11 @@ public class BcryptPasswordHasher : IPasswordHasher<ApplicationUser>
         if (string.IsNullOrEmpty(password))
         {
             throw new ArgumentNullException(nameof(password), "La contraseña no puede ser nula ni vacía.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(password) > 72)
+        {
+            throw new ArgumentException("La contraseña no puede superar los 72 bytes UTF-8.", nameof(password));
         }
 
         return BCrypt.Net.BCrypt.HashPassword(password, _workFactor);

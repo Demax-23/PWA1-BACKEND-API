@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using TeaLearning.Core.Entities;
 using TeaLearning.Data.Context;
@@ -62,6 +63,16 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             teacherProfile.User = user;
         }
 
+        if (dto.AssignmentId.HasValue)
+        {
+            var assignmentExists = await _context.ActivityAssignments
+                .AnyAsync(aa => aa.Id == dto.AssignmentId.Value && aa.StudentProfileId == studentId && aa.IsActive, cancellationToken);
+            if (!assignmentExists)
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("La actividad asignada seleccionada no existe o no pertenece a este estudiante.");
+            }
+        }
+
         var note = new PedagogicalNote
         {
             StudentProfileId = studentId,
@@ -69,16 +80,20 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             Contenido = dto.Contenido.Trim(),
             FechaRegistro = DateTime.UtcNow,
             Titulo = dto.Titulo?.Trim() ?? string.Empty,
-            Tipo = dto.Tipo ?? "Observacion",
-            Area = dto.Area ?? "Socioemocional",
+            Tipo = dto.Tipo?.Trim() ?? "Observacion",
+            Area = dto.Area?.Trim() ?? "Socioemocional",
             RecomendacionCasa = dto.RecomendacionCasa?.Trim(),
             VisibleAcudiente = dto.VisibleAcudiente ?? true,
             AssignmentId = dto.AssignmentId,
             IsActive = true
         };
 
-        if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
+        if (!string.IsNullOrWhiteSpace(dto.Fecha))
         {
+            if (!DateTime.TryParse(dto.Fecha.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsedDate))
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("El formato de la fecha de la observación no es válido (use YYYY-MM-DD).");
+            }
             if (parsedDate.Date > DateTime.UtcNow.Date.AddDays(1))
             {
                 return ApiResponse<PedagogicalNoteDto>.Fail("La fecha de la observación pedagógica no puede ser una fecha futura.");
@@ -173,16 +188,30 @@ public class PedagogicalNoteService : IPedagogicalNoteService
             return ApiResponse<PedagogicalNoteDto>.Fail("No tiene autorización para editar esta observación pedagógica.");
         }
 
+        if (dto.AssignmentId.HasValue)
+        {
+            var assignmentExists = await _context.ActivityAssignments
+                .AnyAsync(aa => aa.Id == dto.AssignmentId.Value && aa.StudentProfileId == note.StudentProfileId && aa.IsActive, cancellationToken);
+            if (!assignmentExists)
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("La actividad asignada seleccionada no existe o no pertenece a este estudiante.");
+            }
+        }
+
         note.Contenido = dto.Contenido.Trim();
         note.Titulo = dto.Titulo?.Trim() ?? string.Empty;
-        note.Tipo = dto.Tipo ?? note.Tipo;
-        note.Area = dto.Area ?? note.Area;
+        note.Tipo = dto.Tipo?.Trim() ?? note.Tipo;
+        note.Area = dto.Area?.Trim() ?? note.Area;
         note.RecomendacionCasa = dto.RecomendacionCasa?.Trim();
         note.VisibleAcudiente = dto.VisibleAcudiente ?? note.VisibleAcudiente;
         note.AssignmentId = dto.AssignmentId;
         note.UpdatedAt = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(dto.Fecha) && DateTime.TryParse(dto.Fecha, out var parsedDate))
+        if (!string.IsNullOrWhiteSpace(dto.Fecha))
         {
+            if (!DateTime.TryParse(dto.Fecha.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsedDate))
+            {
+                return ApiResponse<PedagogicalNoteDto>.Fail("El formato de la fecha de la observación no es válido (use YYYY-MM-DD).");
+            }
             if (parsedDate.Date > DateTime.UtcNow.Date.AddDays(1))
             {
                 return ApiResponse<PedagogicalNoteDto>.Fail("La fecha de la observación pedagógica no puede ser una fecha futura.");

@@ -30,9 +30,12 @@ public class ActivitiesController : BaseApiController
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? moduloId = null, 
         [FromQuery] TipoActividad? tipoActividad = null, 
-        [FromQuery] Guid? docenteId = null)
+        [FromQuery] Guid? docenteId = null,
+        [FromQuery] bool onlyActive = true)
     {
-        var result = await _activityService.GetActivitiesAsync(moduloId, tipoActividad, docenteId);
+        bool canViewInactive = User.IsInRole("Docente") || User.IsInRole("Administrador");
+        bool effectiveOnlyActive = canViewInactive ? onlyActive : true;
+        var result = await _activityService.GetActivitiesAsync(moduloId, tipoActividad, docenteId, effectiveOnlyActive);
         return Ok(result);
     }
 

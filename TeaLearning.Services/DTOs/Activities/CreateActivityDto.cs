@@ -26,4 +26,6 @@ public class CreateActivityDto
 
     [Required(ErrorMessage = "El identificador del módulo temático es obligatorio")]
     public Guid ModuloId { get; set; }
+
+    public bool IsActive { get; set; } = true;
 }

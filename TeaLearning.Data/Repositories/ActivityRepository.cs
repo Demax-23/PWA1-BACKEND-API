@@ -11,26 +11,39 @@ public class ActivityRepository : GenericRepository<Activity>, IActivityReposito
     {
     }
 
-    public async Task<Activity?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Activity?> GetByIdWithDetailsAsync(Guid id, bool includeInactive = false, CancellationToken cancellationToken = default)
     {
-        return await _context.Activities
+        var query = _context.Activities
             .Include(a => a.Modulo)
             .Include(a => a.Docente)
                 .ThenInclude(d => d.User)
-            .FirstOrDefaultAsync(a => a.Id == id && a.IsActive, cancellationToken);
+            .Where(a => a.Id == id);
+
+        if (!includeInactive)
+        {
+            query = query.Where(a => a.IsActive);
+        }
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Activity>> GetFilteredAsync(
         Guid? moduloId = null, 
         TipoActividad? tipoActividad = null, 
         Guid? docenteId = null, 
+        bool onlyActive = true,
         CancellationToken cancellationToken = default)
     {
         var query = _context.Activities
             .Include(a => a.Modulo)
             .Include(a => a.Docente)
                 .ThenInclude(d => d.User)
-            .Where(a => a.IsActive);
+            .AsQueryable();
+
+        if (onlyActive)
+        {
+            query = query.Where(a => a.IsActive);
+        }
 
         if (moduloId.HasValue)
         {

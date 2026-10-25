@@ -243,7 +243,12 @@ public class AssignmentService : IAssignmentService
             var teacher = await _context.TeacherProfiles
                 .FirstOrDefaultAsync(t => t.UserId == currentUserId.Value && t.IsActive, cancellationToken);
 
-            if (teacher != null && assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
+            if (teacher == null)
+            {
+                return ApiResponse<bool>.Fail("No tiene autorización ni perfil docente activo para eliminar esta asignación.");
+            }
+
+            if (assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
             {
                 bool isActivityOwner = assignment.Activity.DocenteId == teacher.Id;
                 bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
@@ -276,14 +281,22 @@ public class AssignmentService : IAssignmentService
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.IsActive, cancellationToken);
 
-        if (!isAdmin && teacher != null && assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
+        if (!isAdmin)
         {
-            bool isActivityOwner = assignment.Activity.DocenteId == teacher.Id;
-            bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
-                                    assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
-            if (!isActivityOwner && !isClassroomOwner)
+            if (teacher == null)
             {
-                return ApiResponse<AssignmentGradeDto>.Fail("No tiene autorización para calificar una asignación perteneciente a otro docente.");
+                return ApiResponse<AssignmentGradeDto>.Fail("No tiene autorización ni perfil docente activo para calificar esta asignación.");
+            }
+
+            if (assignment.Activity != null && assignment.Activity.DocenteId != Guid.Empty)
+            {
+                bool isActivityOwner = assignment.Activity.DocenteId == teacher.Id;
+                bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
+                                        assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+                if (!isActivityOwner && !isClassroomOwner)
+                {
+                    return ApiResponse<AssignmentGradeDto>.Fail("No tiene autorización para calificar una asignación perteneciente a otro docente.");
+                }
             }
         }
 
@@ -298,6 +311,11 @@ public class AssignmentService : IAssignmentService
         {
             assignment.CalificadoPorDocenteId = teacher.Id;
             assignment.CalificadoPorDocente = teacher;
+        }
+        else if (isAdmin)
+        {
+            assignment.CalificadoPorDocenteId = null;
+            assignment.CalificadoPorDocente = null;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -324,17 +342,19 @@ public class AssignmentService : IAssignmentService
             var teacher = await _context.TeacherProfiles
                 .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.IsActive, cancellationToken);
 
-            if (teacher != null)
+            if (teacher == null)
             {
-                bool isActivityOwner = assignment.Activity == null || assignment.Activity.DocenteId == Guid.Empty || assignment.Activity.DocenteId == teacher.Id;
-                bool isGraderOwner = !assignment.CalificadoPorDocenteId.HasValue || assignment.CalificadoPorDocenteId.Value == teacher.Id;
-                bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
-                                        assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+                return ApiResponse<bool>.Fail("No tiene autorización ni perfil docente activo para eliminar calificaciones.");
+            }
 
-                if (!isActivityOwner && !isGraderOwner && !isClassroomOwner)
-                {
-                    return ApiResponse<bool>.Fail("No tiene autorización para eliminar la calificación registrada por otro docente.");
-                }
+            bool isActivityOwner = assignment.Activity != null && assignment.Activity.DocenteId == teacher.Id;
+            bool isGraderOwner = assignment.CalificadoPorDocenteId.HasValue && assignment.CalificadoPorDocenteId.Value == teacher.Id;
+            bool isClassroomOwner = assignment.StudentProfile?.Classroom != null &&
+                                    assignment.StudentProfile.Classroom.TeacherProfileId == teacher.Id;
+
+            if (!isActivityOwner && !isGraderOwner && !isClassroomOwner)
+            {
+                return ApiResponse<bool>.Fail("No tiene autorización para eliminar la calificación registrada por otro usuario.");
             }
         }
 

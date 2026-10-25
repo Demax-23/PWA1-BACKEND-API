@@ -15,5 +15,6 @@ public class ActivityDto
     public string ModuloTitulo { get; set; } = string.Empty;
     public Guid DocenteId { get; set; }
     public string DocenteNombre { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
 }

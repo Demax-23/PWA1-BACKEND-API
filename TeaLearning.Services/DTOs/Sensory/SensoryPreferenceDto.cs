@@ -15,5 +15,7 @@ public class SensoryPreferenceDto
     public int NivelEscalaFuente { get; set; }
     public ModoContraste ModoContraste { get; set; }
     public bool OcultarTemporizadores { get; set; }
+    public string ModoTemporizador { get; set; } = "tiempo-extendido";
+    public int SegundosAvisoPrevio { get; set; } = 15;
     public bool MayorEspacioEntreLetras { get; set; }
 }

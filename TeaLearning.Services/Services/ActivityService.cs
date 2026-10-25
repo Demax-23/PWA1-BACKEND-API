@@ -30,9 +30,10 @@ public class ActivityService : IActivityService
         Guid? moduloId = null, 
         TipoActividad? tipoActividad = null, 
         Guid? docenteId = null, 
+        bool onlyActive = true,
         CancellationToken cancellationToken = default)
     {
-        var activities = await _activityRepository.GetFilteredAsync(moduloId, tipoActividad, docenteId, cancellationToken);
+        var activities = await _activityRepository.GetFilteredAsync(moduloId, tipoActividad, docenteId, onlyActive, cancellationToken);
 
         var dtoList = activities.Select(MapToDto).ToList();
         return ApiResponse<List<ActivityDto>>.Ok(dtoList, $"Se recuperaron {dtoList.Count} actividades pedagógicas");
@@ -40,7 +41,7 @@ public class ActivityService : IActivityService
 
     public async Task<ApiResponse<ActivityDto>> GetActivityByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var activity = await _activityRepository.GetByIdWithDetailsAsync(id, cancellationToken);
+        var activity = await _activityRepository.GetByIdWithDetailsAsync(id, includeInactive: false, cancellationToken);
         if (activity == null)
         {
             return ApiResponse<ActivityDto>.Fail($"Actividad pedagógica con ID {id} no encontrada.");
@@ -55,37 +56,41 @@ public class ActivityService : IActivityService
         CancellationToken cancellationToken = default)
     {
         // 1. Validar que el módulo exista
-        var module = await _moduleRepository.GetByIdAsync(dto.ModuloId, cancellationToken);
+        var module = await _moduleRepository.GetWithActivitiesAsync(dto.ModuloId, includeInactive: true, cancellationToken);
         if (module == null)
         {
             return ApiResponse<ActivityDto>.Fail($"El módulo pedagógico con ID {dto.ModuloId} no existe.");
         }
 
-        // 2. Obtener o validar el perfil de docente del usuario autenticado
+        // 2. Obtener o crear el perfil de docente propio del usuario autenticado (nunca asignar a otro docente ajeno)
         var teacherProfile = await _context.TeacherProfiles
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.UserId == teacherUserId, cancellationToken);
 
         if (teacherProfile == null)
         {
-            teacherProfile = await _context.TeacherProfiles.FirstOrDefaultAsync(cancellationToken);
-            if (teacherProfile == null)
+            var userExists = await _context.Users.AnyAsync(u => u.Id == teacherUserId && u.IsActive, cancellationToken);
+            if (!userExists)
             {
-                teacherProfile = new TeacherProfile
-                {
-                    UserId = teacherUserId,
-                    Especialidad = "Educación Especial y TEA Nivel 1",
-                    NumeroRegistroProfesional = "REG-DOC-AUTO-01"
-                };
-                _context.TeacherProfiles.Add(teacherProfile);
-                await _context.SaveChangesAsync(cancellationToken);
+                return ApiResponse<ActivityDto>.Fail("No se pudo verificar el usuario autenticado para crear la actividad.");
             }
+
+            teacherProfile = new TeacherProfile
+            {
+                UserId = teacherUserId,
+                Especialidad = "Educación Especial y TEA Nivel 1",
+                NumeroRegistroProfesional = $"REG-DOC-{DateTime.UtcNow.Ticks % 1000000:D6}",
+                IsActive = true
+            };
+            _context.TeacherProfiles.Add(teacherProfile);
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
-        // 3. Validar sintaxis del JSON dinámico (ConfigJson)
-        if (!IsValidJson(dto.ConfigJson))
+        // 3. Validar sintaxis y contenido mínimo del JSON dinámico (ConfigJson)
+        var configValidationError = ValidateActivityConfig(dto.TipoActividad, dto.ConfigJson);
+        if (configValidationError != null)
         {
-            return ApiResponse<ActivityDto>.Fail("La estructura de ConfigJson no es un JSON válido.");
+            return ApiResponse<ActivityDto>.Fail(configValidationError);
         }
 
         var activity = new Activity
@@ -97,13 +102,13 @@ public class ActivityService : IActivityService
             ConfigJson = dto.ConfigJson,
             ModuloId = dto.ModuloId,
             DocenteId = teacherProfile.Id,
-            IsActive = true
+            IsActive = dto.IsActive
         };
 
         await _activityRepository.AddAsync(activity, cancellationToken);
 
-        // Recargar con relaciones
-        var createdWithDetails = await _activityRepository.GetByIdWithDetailsAsync(activity.Id, cancellationToken);
+        // Recargar con relaciones (incluyendo si se creó inicialmente como inactiva)
+        var createdWithDetails = await _activityRepository.GetByIdWithDetailsAsync(activity.Id, includeInactive: true, cancellationToken);
         return ApiResponse<ActivityDto>.Ok(MapToDto(createdWithDetails ?? activity), "Actividad pedagógica creada exitosamente");
     }
 
@@ -114,7 +119,7 @@ public class ActivityService : IActivityService
         bool isAdmin = false, 
         CancellationToken cancellationToken = default)
     {
-        var activity = await _activityRepository.GetByIdWithDetailsAsync(id, cancellationToken);
+        var activity = await _activityRepository.GetByIdWithDetailsAsync(id, includeInactive: true, cancellationToken);
         if (activity == null)
         {
             return ApiResponse<ActivityDto>.Fail($"Actividad con ID {id} no encontrada.");
@@ -133,16 +138,17 @@ public class ActivityService : IActivityService
         }
 
         // Validar módulo
-        var module = await _moduleRepository.GetByIdAsync(dto.ModuloId, cancellationToken);
+        var module = await _moduleRepository.GetWithActivitiesAsync(dto.ModuloId, includeInactive: true, cancellationToken);
         if (module == null)
         {
             return ApiResponse<ActivityDto>.Fail($"El módulo pedagógico con ID {dto.ModuloId} no existe.");
         }
 
         // Validar ConfigJson
-        if (!IsValidJson(dto.ConfigJson))
+        var configValidationError = ValidateActivityConfig(dto.TipoActividad, dto.ConfigJson);
+        if (configValidationError != null)
         {
-            return ApiResponse<ActivityDto>.Fail("La estructura de ConfigJson no es un JSON válido.");
+            return ApiResponse<ActivityDto>.Fail(configValidationError);
         }
 
         activity.Titulo = dto.Titulo.Trim();
@@ -151,10 +157,14 @@ public class ActivityService : IActivityService
         activity.ObjetivoPedagogico = dto.ObjetivoPedagogico.Trim();
         activity.ConfigJson = dto.ConfigJson;
         activity.ModuloId = dto.ModuloId;
+        if (dto.IsActive.HasValue)
+        {
+            activity.IsActive = dto.IsActive.Value;
+        }
 
         await _activityRepository.UpdateAsync(activity, cancellationToken);
 
-        var updatedWithDetails = await _activityRepository.GetByIdWithDetailsAsync(id, cancellationToken);
+        var updatedWithDetails = await _activityRepository.GetByIdWithDetailsAsync(id, includeInactive: true, cancellationToken);
         return ApiResponse<ActivityDto>.Ok(MapToDto(updatedWithDetails ?? activity), "Actividad pedagógica actualizada exitosamente");
     }
 
@@ -164,7 +174,7 @@ public class ActivityService : IActivityService
         bool isAdmin = false, 
         CancellationToken cancellationToken = default)
     {
-        var activity = await _activityRepository.GetByIdAsync(id, cancellationToken);
+        var activity = await _activityRepository.GetByIdWithDetailsAsync(id, includeInactive: true, cancellationToken);
         if (activity == null)
         {
             return ApiResponse<bool>.Fail($"Actividad con ID {id} no encontrada.");
@@ -195,11 +205,11 @@ public class ActivityService : IActivityService
         return ApiResponse<bool>.Ok(true, "Actividad pedagógica eliminada exitosamente");
     }
 
-    private static bool IsValidJson(string strInput)
+    private static string? ValidateActivityConfig(TipoActividad tipoActividad, string strInput)
     {
         if (string.IsNullOrWhiteSpace(strInput) || strInput.Length > 16384)
         {
-            return false;
+            return "La estructura de ConfigJson es obligatoria y no debe superar los 16 KB.";
         }
 
         string[] dangerousPatterns = ["<script", "javascript:", "onerror=", "onload=", "<iframe", "vbscript:", "data:text/html"];
@@ -207,7 +217,7 @@ public class ActivityService : IActivityService
         {
             if (strInput.Contains(pattern, StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return "La estructura de ConfigJson contiene contenido no permitido.";
             }
         }
 
@@ -217,12 +227,107 @@ public class ActivityService : IActivityService
             {
                 MaxDepth = 8
             });
-            return doc.RootElement.ValueKind == JsonValueKind.Object;
+
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return "La estructura de ConfigJson debe ser un objeto JSON válido.";
+            }
+
+            var root = doc.RootElement;
+            if (!root.EnumerateObject().Any())
+            {
+                return "La actividad no puede guardarse con una configuración vacía.";
+            }
+
+            if (tipoActividad == TipoActividad.SecuenciaLogica)
+            {
+                JsonElement stepsEl = default;
+                bool hasSteps = (root.TryGetProperty("pasos", out stepsEl) && stepsEl.ValueKind == JsonValueKind.Array)
+                             || (root.TryGetProperty("steps", out stepsEl) && stepsEl.ValueKind == JsonValueKind.Array);
+
+                if (!hasSteps)
+                {
+                    return "La secuencia lógica debe incluir la lista de pasos.";
+                }
+
+                int validCount = 0;
+                foreach (var item in stepsEl.EnumerateArray())
+                {
+                    string? label = item.ValueKind == JsonValueKind.String
+                        ? item.GetString()
+                        : (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("label", out var lbl) && lbl.ValueKind == JsonValueKind.String
+                            ? lbl.GetString()
+                            : null);
+
+                    if (!string.IsNullOrWhiteSpace(label))
+                    {
+                        validCount++;
+                    }
+                }
+
+                if (validCount < 2)
+                {
+                    return "La actividad de secuencia lógica requiere al menos 2 pasos con texto.";
+                }
+            }
+            else if (tipoActividad == TipoActividad.EmparejamientoVisual)
+            {
+                JsonElement pairsEl = default;
+                bool hasPairs = (root.TryGetProperty("parejas", out pairsEl) && pairsEl.ValueKind == JsonValueKind.Array)
+                             || (root.TryGetProperty("pairs", out pairsEl) && pairsEl.ValueKind == JsonValueKind.Array)
+                             || (root.TryGetProperty("pares", out pairsEl) && pairsEl.ValueKind == JsonValueKind.Array);
+
+                if (!hasPairs)
+                {
+                    return "La actividad de emparejamiento visual debe incluir la lista de parejas.";
+                }
+
+                int validCount = 0;
+                foreach (var item in pairsEl.EnumerateArray())
+                {
+                    if (item.ValueKind != JsonValueKind.Object) continue;
+
+                    string? left = GetFirstString(item, "leftLabel", "emocion", "elementoA");
+                    string? right = GetFirstString(item, "rightLabel", "pareja", "elementoB", "color");
+
+                    bool leftEmpty = string.IsNullOrWhiteSpace(left);
+                    bool rightEmpty = string.IsNullOrWhiteSpace(right);
+
+                    if (leftEmpty != rightEmpty)
+                    {
+                        return "Todas las parejas de emparejamiento deben tener completos ambos elementos (izquierdo y derecho).";
+                    }
+
+                    if (!leftEmpty && !rightEmpty)
+                    {
+                        validCount++;
+                    }
+                }
+
+                if (validCount < 2)
+                {
+                    return "La actividad de emparejamiento visual requiere al menos 2 parejas completas.";
+                }
+            }
+
+            return null;
         }
         catch (JsonException)
         {
-            return false;
+            return "La estructura de ConfigJson no es un JSON válido.";
         }
+    }
+
+    private static string? GetFirstString(JsonElement obj, params string[] keys)
+    {
+        foreach (var k in keys)
+        {
+            if (obj.TryGetProperty(k, out var prop) && prop.ValueKind == JsonValueKind.String)
+            {
+                return prop.GetString();
+            }
+        }
+        return null;
     }
 
     private static ActivityDto MapToDto(Activity a)
@@ -239,6 +344,7 @@ public class ActivityService : IActivityService
             ModuloTitulo = a.Modulo?.Titulo ?? string.Empty,
             DocenteId = a.DocenteId,
             DocenteNombre = a.Docente?.User?.NombreCompleto ?? string.Empty,
+            IsActive = a.IsActive,
             CreatedAt = a.CreatedAt
         };
     }

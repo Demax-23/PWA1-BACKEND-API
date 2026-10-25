@@ -22,12 +22,26 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // 0. Configuración de Proxy Inverso (Azure App Service / Cloudflare) para preservar IP real y esquema HTTPS
+        // 0. Configuración segura de Proxy Inverso (Azure App Service / entorno local)
+        // Solo confía en un salto (ForwardLimit = 1) proveniente de loopback o subredes internas de proxy,
+        // impidiendo que clientes externos falsifiquen el primer valor de X-Forwarded-For.
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = 1;
             options.KnownNetworks.Clear();
             options.KnownProxies.Clear();
+
+            options.KnownProxies.Add(System.Net.IPAddress.Loopback);
+            options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("127.0.0.0"), 8));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("192.168.0.0"), 16));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("169.254.0.0"), 16));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("fc00::"), 7));
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("fe80::"), 10));
         });
 
         // 1. Configuración de Base de Datos SQL Server / Azure SQL con resiliencia ante fallos transitorios
@@ -139,24 +153,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
 
-        // 5.2 Limitación de solicitudes por IP real (compatible con ForwardedHeaders en Azure App Service)
+        // 5.2 Limitación de solicitudes por IP real ya resuelta por ForwardedHeadersMiddleware (evita spoofing de X-Forwarded-For)
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-            static string ResolveClientIp(HttpContext context)
+            options.OnRejected = async (context, cancellationToken) =>
             {
-                var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(forwardedFor))
-                {
-                    var firstIp = forwardedFor.Split(',')[0].Trim();
-                    if (!string.IsNullOrWhiteSpace(firstIp))
-                    {
-                        return firstIp;
-                    }
-                }
-                return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            }
+                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.HttpContext.Response.ContentType = "application/json";
+                var payload = TeaLearning.Services.Common.ApiResponse<object>.Fail(
+                    "Demasiados intentos seguidos. Espera unos minutos antes de volver a intentarlo.");
+                await context.HttpContext.Response.WriteAsJsonAsync(payload, cancellationToken);
+            };
+
+            static string ResolveClientIp(HttpContext context) =>
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
             static RateLimitPartition<string> PerIp(HttpContext context, int permitLimit, int windowMinutes = 15) =>
                 RateLimitPartition.GetFixedWindowLimiter(

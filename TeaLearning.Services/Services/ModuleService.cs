@@ -18,11 +18,7 @@ public class ModuleService : IModuleService
 
     public async Task<ApiResponse<List<ModuleDto>>> GetAllModulesAsync(bool onlyActive = true, CancellationToken cancellationToken = default)
     {
-        var modules = await _moduleRepository.GetAllWithActivitiesCountAsync(cancellationToken);
-        if (onlyActive)
-        {
-            modules = modules.Where(m => m.IsActive).ToList();
-        }
+        var modules = await _moduleRepository.GetAllWithActivitiesCountAsync(onlyActive, cancellationToken);
 
         var dtoList = modules.Select(m => new ModuleDto
         {
@@ -43,7 +39,7 @@ public class ModuleService : IModuleService
 
     public async Task<ApiResponse<ModuleDetailDto>> GetModuleByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var module = await _moduleRepository.GetWithActivitiesAsync(id, cancellationToken);
+        var module = await _moduleRepository.GetWithActivitiesAsync(id, includeInactive: false, cancellationToken);
         if (module == null)
         {
             return ApiResponse<ModuleDetailDto>.Fail($"Módulo temático con ID {id} no encontrado.");
@@ -107,7 +103,7 @@ public class ModuleService : IModuleService
 
     public async Task<ApiResponse<ModuleDto>> UpdateModuleAsync(Guid id, UpdateModuleDto dto, CancellationToken cancellationToken = default)
     {
-        var module = await _moduleRepository.GetByIdAsync(id, cancellationToken);
+        var module = await _moduleRepository.GetWithActivitiesAsync(id, includeInactive: true, cancellationToken);
         if (module == null)
         {
             return ApiResponse<ModuleDto>.Fail($"Módulo temático con ID {id} no encontrado.");
@@ -139,7 +135,8 @@ public class ModuleService : IModuleService
             Icono = module.Icono,
             Orden = module.Orden,
             CategoriaId = module.CategoriaId,
-            TotalActividades = 0,
+            CategoriaNombre = module.Categoria?.Nombre,
+            TotalActividades = module.Activities?.Count ?? 0,
             IsActive = module.IsActive,
             CreatedAt = module.CreatedAt
         };
@@ -149,10 +146,15 @@ public class ModuleService : IModuleService
 
     public async Task<ApiResponse<bool>> DeleteModuleAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var module = await _moduleRepository.GetWithActivitiesAsync(id, cancellationToken);
+        var module = await _moduleRepository.GetWithActivitiesAsync(id, includeInactive: true, cancellationToken);
         if (module == null)
         {
             return ApiResponse<bool>.Fail($"Módulo temático con ID {id} no encontrado.");
+        }
+
+        if (module.Activities.Any())
+        {
+            return ApiResponse<bool>.Fail("No es posible eliminar el módulo porque tiene actividades activas vinculadas.");
         }
 
         await _moduleRepository.DeleteAsync(module, cancellationToken);

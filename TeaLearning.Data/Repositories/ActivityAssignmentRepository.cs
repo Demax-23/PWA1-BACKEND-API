@@ -21,7 +21,12 @@ public class ActivityAssignmentRepository : GenericRepository<ActivityAssignment
         return await _context.ActivityAssignments
             .Include(aa => aa.Activity)
                 .ThenInclude(a => a.Modulo)
+                    .ThenInclude(m => m!.Categoria)
             .Where(aa => aa.StudentProfileId == studentProfileId && aa.IsActive)
+            .Where(aa => aa.Activity.IsActive &&
+                         (aa.Activity.Modulo == null ||
+                          (aa.Activity.Modulo.IsActive &&
+                           (aa.Activity.Modulo.Categoria == null || aa.Activity.Modulo.Categoria.IsActive))))
             .Where(aa => aa.FechaInicio.Date <= targetDate && 
                         (aa.FechaLimite == null || aa.FechaLimite.Value.Date >= targetDate))
             .OrderBy(aa => aa.OrdenSecuencial)

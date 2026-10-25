@@ -37,4 +37,10 @@ public class SensoryPreference : BaseEntity
 
     // Previene ansiedad por competencia temporal
     public bool OcultarTemporizadores { get; set; } = true;
+
+    // Modo de temporizador ("sin-temporizador", "tiempo-extendido", "estandar")
+    public string ModoTemporizador { get; set; } = "sin-temporizador";
+
+    // Segundos de aviso previo antes de finalizar o cambiar actividad (0 a 60)
+    public int SegundosAvisoPrevio { get; set; } = 15;
 }

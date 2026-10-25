@@ -163,6 +163,8 @@ public class UserService : IUserService
         user.RefreshTokenExpiryTime = null;
         await _userManager.UpdateSecurityStampAsync(user);
 
+        await EnsureRoleProfilesAsync(user, dto.Roles);
+
         var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
         var teacherProfile = await _context.TeacherProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
         var guardianProfile = await _context.GuardianProfiles.FirstOrDefaultAsync(g => g.UserId == user.Id);
@@ -277,6 +279,7 @@ public class UserService : IUserService
         }
 
         var finalRoles = await _userManager.GetRolesAsync(user);
+        await EnsureRoleProfilesAsync(user, finalRoles);
 
         var studentProfile = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
         var teacherProfile = await _context.TeacherProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
@@ -315,6 +318,38 @@ public class UserService : IUserService
             return ApiResponse<bool>.Fail("Usuario no encontrado en la base de datos.");
         }
 
+        // Si es Estudiante, verificar historial clínico/pedagógico protegido por integridad referencial
+        if (user.StudentProfile != null)
+        {
+            var studentProfileId = user.StudentProfile.Id;
+            var hasExecutions = await _context.ActivityExecutions.AnyAsync(e => e.StudentProfileId == studentProfileId);
+            var hasNotes = await _context.PedagogicalNotes.AnyAsync(n => n.StudentProfileId == studentProfileId);
+            var hasGradedAssignments = await _context.ActivityAssignments.AnyAsync(
+                aa => aa.StudentProfileId == studentProfileId && aa.Calificacion.HasValue);
+
+            if (hasExecutions || hasNotes || hasGradedAssignments)
+            {
+                return ApiResponse<bool>.Fail(
+                    "No es posible eliminar el estudiante porque registra ejecuciones, calificaciones o notas pedagógicas en su historial. Cambie su estado a Inactivo para preservar la trazabilidad.");
+            }
+        }
+
+        // Si es Docente, verificar actividades, aulas, notas o calificaciones restringidas
+        if (user.TeacherProfile != null)
+        {
+            var teacherId = user.TeacherProfile.Id;
+            var hasActivities = await _context.Activities.AnyAsync(a => a.DocenteId == teacherId);
+            var hasClassrooms = await _context.Classrooms.AnyAsync(c => c.TeacherProfileId == teacherId);
+            var hasNotes = await _context.PedagogicalNotes.AnyAsync(n => n.TeacherProfileId == teacherId);
+            var hasGrades = await _context.ActivityAssignments.AnyAsync(aa => aa.CalificadoPorDocenteId == teacherId);
+
+            if (hasActivities || hasClassrooms || hasNotes || hasGrades)
+            {
+                return ApiResponse<bool>.Fail(
+                    "No es posible eliminar el docente porque tiene actividades pedagógicas, aulas, notas o calificaciones vinculadas. Cambie su estado a Inactivo o reasigne sus registros primero.");
+            }
+        }
+
         // Si es Acudiente, desvincular estudiantes asociados para evitar violación de restricción referencial
         if (user.GuardianProfile != null)
         {
@@ -328,17 +363,6 @@ public class UserService : IUserService
             await _context.SaveChangesAsync();
         }
 
-        // Si es Docente, verificar si tiene aulas o actividades restringidas
-        if (user.TeacherProfile != null)
-        {
-            var hasActivities = await _context.Activities.AnyAsync(a => a.DocenteId == user.TeacherProfile.Id);
-            var hasClassrooms = await _context.Classrooms.AnyAsync(c => c.TeacherProfileId == user.TeacherProfile.Id);
-            if (hasActivities || hasClassrooms)
-            {
-                return ApiResponse<bool>.Fail("No es posible eliminar el docente porque tiene actividades pedagógicas o aulas vinculadas. Debe reasignar o eliminar esas actividades primero.");
-            }
-        }
-
         var deleteResult = await _userManager.DeleteAsync(user);
         if (!deleteResult.Succeeded)
         {
@@ -346,6 +370,95 @@ public class UserService : IUserService
         }
 
         return ApiResponse<bool>.Ok(true, "Usuario eliminado permanentemente de la base de datos.");
+    }
+
+    private async Task EnsureRoleProfilesAsync(ApplicationUser user, IEnumerable<string> roles)
+    {
+        var roleSet = new HashSet<string>(roles, StringComparer.OrdinalIgnoreCase);
+
+        if (roleSet.Contains("Docente"))
+        {
+            var teacher = await _context.TeacherProfiles.FirstOrDefaultAsync(t => t.UserId == user.Id);
+            if (teacher == null)
+            {
+                _context.TeacherProfiles.Add(new TeacherProfile
+                {
+                    UserId = user.Id,
+                    Especialidad = "Pedagogía y Educación Especial",
+                    NumeroRegistroProfesional = $"REG-DOC-{DateTime.UtcNow.Ticks % 1000000:D6}",
+                    IsActive = true
+                });
+                await _context.SaveChangesAsync();
+            }
+            else if (!teacher.IsActive)
+            {
+                teacher.IsActive = true;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        if (roleSet.Contains("Acudiente"))
+        {
+            var guardian = await _context.GuardianProfiles.FirstOrDefaultAsync(g => g.UserId == user.Id);
+            if (guardian == null)
+            {
+                _context.GuardianProfiles.Add(new GuardianProfile
+                {
+                    UserId = user.Id,
+                    TelefonoContacto = "Sin especificar",
+                    Parentesco = "Familiar",
+                    IsActive = true
+                });
+                await _context.SaveChangesAsync();
+            }
+            else if (!guardian.IsActive)
+            {
+                guardian.IsActive = true;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        if (roleSet.Contains("Estudiante"))
+        {
+            var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+            if (student == null)
+            {
+                var defaultClassroom = await _context.Classrooms.FirstOrDefaultAsync(c => c.IsActive);
+                student = new StudentProfile
+                {
+                    UserId = user.Id,
+                    CodigoEstudiante = $"EST-{DateTime.UtcNow.Ticks % 100000:D5}",
+                    FechaNacimiento = DateTime.UtcNow.AddYears(-10),
+                    ClassroomId = defaultClassroom?.Id,
+                    IsActive = true
+                };
+                _context.StudentProfiles.Add(student);
+                await _context.SaveChangesAsync();
+
+                _context.SensoryPreferences.Add(new SensoryPreference
+                {
+                    StudentProfileId = student.Id,
+                    PaletaColor = "PastelSuave",
+                    Tipografia = "Atkinson Hyperlegible",
+                    MayorEspacioEntreLetras = false,
+                    AudioActivo = true,
+                    VolumenAudio = 60,
+                    TextoAVoz = true,
+                    AnimacionesReducidas = true,
+                    NivelEscalaFuente = 2,
+                    ModoContraste = Core.Enums.ModoContraste.Estandar,
+                    OcultarTemporizadores = true,
+                    ModoTemporizador = "sin-temporizador",
+                    SegundosAvisoPrevio = 15
+                });
+                await _context.SaveChangesAsync();
+            }
+            else if (!student.IsActive)
+            {
+                student.IsActive = true;
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 
     public async Task<ApiResponse<List<Guid>>> LinkStudentsToGuardianAsync(Guid guardianUserId, List<Guid> studentIds)
@@ -411,7 +524,7 @@ public class UserService : IUserService
         return ApiResponse<List<Guid>>.Ok(linkedUserIds, $"Se vincularon exitosamente {linkedUserIds.Count} estudiantes al acudiente.");
     }
 
-    public async Task<ApiResponse<bool>> ResetStudentPasswordAsync(Guid guardianUserId, Guid studentId, string newPassword)
+    public async Task<ApiResponse<bool>> ResetStudentPasswordAsync(Guid guardianUserId, Guid studentId, string newPassword, bool isAdmin = false)
     {
         // El identificador puede ser el de StudentProfile o el del usuario, igual que en LinkStudentsToGuardianAsync.
         var student = await _context.StudentProfiles
@@ -424,8 +537,8 @@ public class UserService : IUserService
             return ApiResponse<bool>.Fail("Estudiante no encontrado.");
         }
 
-        // Solo el acudiente titular puede cambiar la contraseña de su estudiante.
-        if (student.GuardianProfile == null || student.GuardianProfile.UserId != guardianUserId)
+        // Solo el acudiente titular o un Administrador pueden cambiar la contraseña del estudiante.
+        if (!isAdmin && (student.GuardianProfile == null || student.GuardianProfile.UserId != guardianUserId))
         {
             return ApiResponse<bool>.Fail("No tiene autorización para modificar la contraseña de este estudiante.");
         }

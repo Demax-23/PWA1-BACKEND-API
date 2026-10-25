@@ -58,26 +58,14 @@ public class SensoryPreferenceService : ISensoryPreferenceService
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
                 ModoContraste = Core.Enums.ModoContraste.Estandar,
-                OcultarTemporizadores = true
+                OcultarTemporizadores = true,
+                ModoTemporizador = "sin-temporizador",
+                SegundosAvisoPrevio = 15
             };
             await _sensoryRepo.AddAsync(pref, cancellationToken);
         }
 
-        var dto = new SensoryPreferenceDto
-        {
-            Id = pref.Id,
-            StudentProfileId = pref.StudentProfileId,
-            PaletaColor = pref.PaletaColor,
-            Tipografia = pref.Tipografia,
-            MayorEspacioEntreLetras = pref.MayorEspacioEntreLetras,
-            AudioActivo = pref.AudioActivo,
-            VolumenAudio = pref.VolumenAudio,
-            TextoAVoz = pref.TextoAVoz,
-            AnimacionesReducidas = pref.AnimacionesReducidas,
-            NivelEscalaFuente = pref.NivelEscalaFuente,
-            ModoContraste = pref.ModoContraste,
-            OcultarTemporizadores = pref.OcultarTemporizadores
-        };
+        var dto = MapToDto(pref);
 
         return ApiResponse<SensoryPreferenceDto>.Ok(dto, "Preferencias sensoriales recuperadas exitosamente");
     }
@@ -120,7 +108,20 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             await _sensoryRepo.UpdateAsync(pref, cancellationToken);
         }
 
-        var resultDto = new SensoryPreferenceDto
+        var resultDto = MapToDto(pref);
+
+        return ApiResponse<SensoryPreferenceDto>.Ok(resultDto, "Preferencias sensoriales actualizadas con éxito");
+    }
+
+    private static SensoryPreferenceDto MapToDto(SensoryPreference pref)
+    {
+        var resolvedMode = pref.OcultarTemporizadores
+            ? "sin-temporizador"
+            : (!string.IsNullOrWhiteSpace(pref.ModoTemporizador) && pref.ModoTemporizador != "sin-temporizador"
+                ? pref.ModoTemporizador
+                : "tiempo-extendido");
+
+        return new SensoryPreferenceDto
         {
             Id = pref.Id,
             StudentProfileId = pref.StudentProfileId,
@@ -133,10 +134,10 @@ public class SensoryPreferenceService : ISensoryPreferenceService
             AnimacionesReducidas = pref.AnimacionesReducidas,
             NivelEscalaFuente = pref.NivelEscalaFuente,
             ModoContraste = pref.ModoContraste,
-            OcultarTemporizadores = pref.OcultarTemporizadores
+            OcultarTemporizadores = pref.OcultarTemporizadores,
+            ModoTemporizador = resolvedMode,
+            SegundosAvisoPrevio = Math.Clamp(pref.SegundosAvisoPrevio, 0, 60)
         };
-
-        return ApiResponse<SensoryPreferenceDto>.Ok(resultDto, "Preferencias sensoriales actualizadas con éxito");
     }
 
     private static void ApplyDtoToEntity(UpdateSensoryPreferenceDto dto, SensoryPreference entity)
@@ -156,6 +157,24 @@ public class SensoryPreferenceService : ISensoryPreferenceService
         entity.AnimacionesReducidas = dto.AnimacionesReducidas;
         entity.NivelEscalaFuente = dto.NivelEscalaFuente;
         entity.ModoContraste = dto.ModoContraste;
-        entity.OcultarTemporizadores = dto.OcultarTemporizadores;
+
+        if (!string.IsNullOrWhiteSpace(dto.ModoTemporizador))
+        {
+            var mode = dto.ModoTemporizador.Trim().ToLowerInvariant();
+            entity.ModoTemporizador = mode;
+            entity.OcultarTemporizadores = mode == "sin-temporizador";
+        }
+        else
+        {
+            entity.OcultarTemporizadores = dto.OcultarTemporizadores;
+            entity.ModoTemporizador = dto.OcultarTemporizadores
+                ? "sin-temporizador"
+                : (entity.ModoTemporizador == "estandar" ? "estandar" : "tiempo-extendido");
+        }
+
+        if (dto.SegundosAvisoPrevio.HasValue)
+        {
+            entity.SegundosAvisoPrevio = Math.Clamp(dto.SegundosAvisoPrevio.Value, 0, 60);
+        }
     }
 }

@@ -243,7 +243,9 @@ public static class DatabaseSeeder
                     AnimacionesReducidas = true,
                     NivelEscalaFuente = 2,
                     ModoContraste = ModoContraste.Estandar,
-                    OcultarTemporizadores = true
+                    OcultarTemporizadores = true,
+                    ModoTemporizador = "sin-temporizador",
+                    SegundosAvisoPrevio = 15
                 };
                 context.SensoryPreferences.Add(sensoryPreference);
                 await context.SaveChangesAsync();
@@ -530,7 +532,9 @@ public static class DatabaseSeeder
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
                 ModoContraste = ModoContraste.Estandar,
-                OcultarTemporizadores = true
+                OcultarTemporizadores = true,
+                ModoTemporizador = "sin-temporizador",
+                SegundosAvisoPrevio = 15
             });
 
             var assignments = new List<ActivityAssignment>();

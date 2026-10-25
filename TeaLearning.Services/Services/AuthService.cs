@@ -122,7 +122,9 @@ public class AuthService : IAuthService
                 AnimacionesReducidas = true,
                 NivelEscalaFuente = 2,
                 ModoContraste = ModoContraste.Estandar,
-                OcultarTemporizadores = true
+                OcultarTemporizadores = true,
+                ModoTemporizador = "sin-temporizador",
+                SegundosAvisoPrevio = 15
             };
             _context.SensoryPreferences.Add(sensoryPreference);
             await _context.SaveChangesAsync();

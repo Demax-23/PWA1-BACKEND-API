@@ -10,6 +10,7 @@ public interface IActivityService
         Guid? moduloId = null, 
         TipoActividad? tipoActividad = null, 
         Guid? docenteId = null, 
+        bool onlyActive = true,
         CancellationToken cancellationToken = default);
 
     Task<ApiResponse<ActivityDto>> GetActivityByIdAsync(

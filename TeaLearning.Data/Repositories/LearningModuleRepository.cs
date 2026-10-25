@@ -10,22 +10,36 @@ public class LearningModuleRepository : GenericRepository<LearningModule>, ILear
     {
     }
 
-    public async Task<IReadOnlyList<LearningModule>> GetAllWithActivitiesCountAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LearningModule>> GetAllWithActivitiesCountAsync(bool onlyActive = true, CancellationToken cancellationToken = default)
     {
-        return await _context.LearningModules
+        var query = _context.LearningModules
             .Include(m => m.Categoria)
             .Include(m => m.Activities.Where(a => a.IsActive))
-            .Where(m => m.IsActive)
+            .AsQueryable();
+
+        if (onlyActive)
+        {
+            query = query.Where(m => m.IsActive);
+        }
+
+        return await query
             .OrderBy(m => m.Orden)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<LearningModule?> GetWithActivitiesAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<LearningModule?> GetWithActivitiesAsync(Guid id, bool includeInactive = false, CancellationToken cancellationToken = default)
     {
-        return await _context.LearningModules
+        var query = _context.LearningModules
             .Include(m => m.Categoria)
             .Include(m => m.Activities.Where(a => a.IsActive))
-            .FirstOrDefaultAsync(m => m.Id == id && m.IsActive, cancellationToken);
+            .Where(m => m.Id == id);
+
+        if (!includeInactive)
+        {
+            query = query.Where(m => m.IsActive);
+        }
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task ShiftOrdersAsync(Guid categoriaId, int fromOrder, int delta, Guid? excludeId = null, CancellationToken cancellationToken = default)

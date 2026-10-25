@@ -29,5 +29,14 @@ public class SensoryPreferenceConfiguration : IEntityTypeConfiguration<SensoryPr
         builder.Property(sp => sp.ModoContraste)
             .HasConversion<string>()
             .HasMaxLength(30);
+
+        builder.Property(sp => sp.ModoTemporizador)
+            .IsRequired()
+            .HasMaxLength(30)
+            .HasDefaultValue("tiempo-extendido");
+
+        builder.Property(sp => sp.SegundosAvisoPrevio)
+            .IsRequired()
+            .HasDefaultValue(15);
     }
 }

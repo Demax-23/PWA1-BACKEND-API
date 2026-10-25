@@ -48,7 +48,11 @@ public class PedagogicalNotesController : BaseApiController
         var result = await _noteService.CreateNoteAsync(id, currentUserId.Value, dto, cancellationToken);
         if (!result.Success)
         {
-            return NotFound(result);
+            if ((result.Message ?? string.Empty).Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(result);
+            }
+            return BadRequest(result);
         }
 
         return StatusCode(StatusCodes.Status201Created, result);
@@ -113,11 +117,16 @@ public class PedagogicalNotesController : BaseApiController
         var result = await _noteService.UpdateNoteAsync(noteId, currentUserId.Value, isAdmin, dto, cancellationToken);
         if (!result.Success)
         {
-            if (result.Message.Contains("autorización", StringComparison.OrdinalIgnoreCase))
+            var msg = result.Message ?? string.Empty;
+            if (msg.Contains("autorización", StringComparison.OrdinalIgnoreCase))
             {
                 return StatusCode(StatusCodes.Status403Forbidden, result);
             }
-            return NotFound(result);
+            if (msg.Contains("no encontrad", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(result);
+            }
+            return BadRequest(result);
         }
 
         return Ok(result);
