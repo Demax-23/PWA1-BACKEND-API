@@ -156,6 +156,38 @@ El semillero (`DatabaseSeeder`) crea —o migra automáticamente de forma idempo
 | **Acudiente** | `tealearning.rol+acudiente@gmail.com` | `Acudiente123!*` | Por correo electrónico (`tealearning.rol@gmail.com`) | `GuardianProfile` con relación a Mateo Pérez |
 | **Estudiante** | `estudiante@tealearning.com` | `Estudiante123!*` | Desde plataforma por su **Acudiente titular** | `StudentProfile` (`EST-TEA-001`) + `SensoryPreference` |
 
+### Datos de Prueba Automatizados y Escenarios de Validación (`TestDataSeeder`)
+
+El semillero automático genera escenarios de prueba exhaustivos con datos deterministas y realistas para validar el 100% de la funcionalidad de la plataforma en todos los roles:
+
+#### 1. Cuentas de Estudiantes Adicionales (Semilla determinista)
+* `estudiante2@tealearning.com` (`EST-18327`): Estudiante activo sin aula asignada inicial.
+* `estudiante3@tealearning.com` a `estudiante12@tealearning.com` (`EST-TEA-003` a `EST-TEA-012`): 10 estudiantes pertenecientes al "Aula Azul" con configuraciones y desempeños diferenciados.
+  * `estudiante3@tealearning.com`: Caso borde **sin ejecuciones previas** (0% de aciertos), con asignaciones de **inicio futuro** (+1 d y +7 d, no visibles hoy en rutina diaria), una asignación vencida pendiente y una inactiva.
+  * `estudiante4@tealearning.com`: Estudiante con desempeño sobresaliente (100% aciertos, contraste bajo, tipografía Arial).
+  * `estudiante5@tealearning.com`: Estudiante con bajo desempeño (~21% aciertos para validar alertas analíticas, contraste alto suave, escala 4).
+  * `estudiante7@tealearning.com`: Estudiante con **más de 45 ejecuciones** para validar la **paginación del historial** (`pageSize=20`), módulo concluido y desbloqueo de **todas las insignias de gamificación**.
+
+#### 2. Cuentas en Estados Especiales y Casos Límite
+* `estudiante13@tealearning.com` (`EST-TEA-013`): Cuenta y perfil de estudiante **inactivos** (`IsActive = false`) para verificar bloqueo en autenticación y exclusión en listados activos de aula.
+* `estudiante14@tealearning.com` (`EST-TEA-014`): Estudiante sin aula ni acudiente asignados, y con refresh token expirado.
+* `estudiante15@tealearning.com`: Usuario con rol Estudiante **sin perfil asociado**, con nombres y apellidos largos con tildes y caracteres especiales para validación de formato.
+* `tealearning.rol+docente3@gmail.com`: Docente inactivo (`IsActive = false`).
+* `tealearning.rol+acudiente3@gmail.com`: Acudiente inactivo (`IsActive = false`), vinculado al estudiante inactivo `estudiante13`.
+
+#### 3. Catálogo, Asignaciones, Calificaciones y Bitácora
+* **Catálogo Pedagógico Extendido**:
+  * Categorías: "Autonomía personal" (activa con módulos) y "Arte y expresión" (activa intencionalmente sin módulos para probar estados vacíos).
+  * Módulos: "Módulo QA: Rutina de Higiene" (completo, 3 actividades), "Módulo QA: Arte con Colores (vacío)" y "Módulo QA: Música Suave (inactivo)".
+  * Actividades con `ConfigJson` variado que abarcan los 4 tipos pedagógicos (`SecuenciaLogica` de 2 y 12 pasos, `EmparejamientoVisual`, `AsociacionEmocional` y `RutinaSocial`).
+  * Corrección automática de la actividad heredada "Lavado de Manos Paso a Paso" a 5 pasos estructurados válidos.
+* **Calificaciones Cuantitativas y Cualitativas (HU-010 / Sprint 4)**:
+  * Asignaciones calificadas que cubren notas límite (`1.0` y `5.0`), intermedias (`3.5`, `4.2`, `4.8`), comentarios límite de 500 caracteres y asignaciones completadas pendientes de calificar.
+* **Paginación y Filtro de Visibilidad en Bitácora (HU-012)**:
+  * Más de 26 notas pedagógicas registradas sobre Mateo Pérez (`EST-TEA-001`), cubriendo la matriz completa de 9 tipos y 9 áreas pedagógicas, notas con y sin recomendación para casa, notas vinculadas a asignaciones, y notas confidenciales del docente (`VisibleAcudiente = false`).
+* **Diversidad Sensorial (HU-003 / HU-006)**:
+  * Variaciones sistemáticas en paletas (`PastelSuave`, `Neutro`, `EscalaGrises`), tipografías (`Atkinson Hyperlegible`, `OpenDyslexic`, `Arial`, `Verdana`), modos de contraste (`Bajo`, `Estandar`, `AltoSuave`), escalas de fuente (1 a 4), volumen de audio (0 a 100) y modos de temporizador (`sin-temporizador`, `tiempo-extendido`, `estandar`).
+
 ---
 
 ## 🔌 Catálogo Completo de Endpoints (Sprints 1, 2, 3 y 4)

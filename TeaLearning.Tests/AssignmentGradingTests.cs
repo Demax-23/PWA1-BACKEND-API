@@ -148,7 +148,7 @@ public class AssignmentGradingTests
         await context.SaveChangesAsync();
 
         // Act
-        var result = await service.RemoveGradeAsync(assignment.Id, Guid.NewGuid());
+        var result = await service.RemoveGradeAsync(assignment.Id, Guid.NewGuid(), isAdmin: true);
 
         // Assert
         Assert.True(result.Success);
