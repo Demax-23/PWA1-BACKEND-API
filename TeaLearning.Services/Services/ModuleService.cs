@@ -157,7 +157,16 @@ public class ModuleService : IModuleService
             return ApiResponse<bool>.Fail("No es posible eliminar el módulo porque tiene actividades activas vinculadas.");
         }
 
+        var categoriaId = module.CategoriaId;
+        var orden = module.Orden;
+
         await _moduleRepository.DeleteAsync(module, cancellationToken);
-        return ApiResponse<bool>.Ok(true, "Módulo temático desactivado exitosamente");
+
+        if (categoriaId.HasValue)
+        {
+            await _moduleRepository.ShiftOrdersAsync(categoriaId.Value, orden + 1, -1, null, cancellationToken);
+        }
+
+        return ApiResponse<bool>.Ok(true, "Módulo temático eliminado exitosamente");
     }
 }

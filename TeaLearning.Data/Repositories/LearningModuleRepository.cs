@@ -10,6 +10,11 @@ public class LearningModuleRepository : GenericRepository<LearningModule>, ILear
     {
     }
 
+    public override async Task DeleteAsync(LearningModule entity, CancellationToken cancellationToken = default)
+    {
+        _context.LearningModules.Remove(entity);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
     public async Task<IReadOnlyList<LearningModule>> GetAllWithActivitiesCountAsync(bool onlyActive = true, CancellationToken cancellationToken = default)
     {
         var query = _context.LearningModules
