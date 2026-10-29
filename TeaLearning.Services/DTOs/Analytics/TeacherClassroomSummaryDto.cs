@@ -11,6 +11,8 @@ public class TeacherClassroomSummaryDto
     public double TasaAciertosPromedioAula { get; set; }
     public double PromedioTiempoRespuestaAula { get; set; }
     public int TotalActividadesCompletadasAula { get; set; }
+    public int TotalIntentosAula { get; set; }
+    public double PromedioIntentosFallidosAula { get; set; }
 
     public List<ActivityTypeMetricDto> TiemposPorTipoActividad { get; set; } = new List<ActivityTypeMetricDto>();
     public List<StudentClassPerformanceDto> DesempenoEstudiantes { get; set; } = new List<StudentClassPerformanceDto>();

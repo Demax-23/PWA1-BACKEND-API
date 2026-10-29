@@ -29,6 +29,12 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
         _context = context;
     }
 
+    private static DateTime GetMondayOfWeek(DateTime date)
+    {
+        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.Date.AddDays(-1 * diff);
+    }
+
     public async Task<ApiResponse<TeacherStudentSummaryDto>> GetStudentAnalyticsSummaryAsync(
         Guid studentId, 
         CancellationToken cancellationToken = default)
@@ -68,7 +74,8 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
                     TipoActividad = g.Key.ToString(),
                     TotalEjecuciones = g.Count(),
                     PromedioTiempoRespuestaSegundos = Math.Round(g.Average(x => x.TiempoRespuestaSegundos), 1),
-                    TasaAciertosPorcentaje = totalTipo > 0 ? Math.Round((double)aciertosTipo / totalTipo * 100.0, 1) : 0.0
+                    TasaAciertosPorcentaje = totalTipo > 0 ? Math.Round((double)aciertosTipo / totalTipo * 100.0, 1) : 0.0,
+                    PromedioIntentosFallidos = g.Any() ? Math.Round((double)fallosTipo / g.Count(), 1) : 0.0
                 };
             })
             .OrderBy(m => m.TipoActividad)
@@ -88,20 +95,20 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             .OrderBy(c => c.Fecha)
             .ToList();
 
-        // 3. Evolución semanal
+        // 3. Evolución semanal alineada al lunes de cada semana
         var evolucionSemanal = executions
-            .GroupBy(e => CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(e.FechaRegistro, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday))
+            .GroupBy(e => GetMondayOfWeek(e.FechaRegistro))
             .Select(g =>
             {
-                var minDate = g.Min(x => x.FechaRegistro);
+                var monday = g.Key;
                 int aciertosSem = g.Sum(x => x.CantidadAciertos);
                 int fallosSem = g.Sum(x => x.CantidadIntentosFallidos);
                 int totalSem = aciertosSem + fallosSem;
 
                 return new WeeklyEvolutionDto
                 {
-                    SemanaEtiqueta = $"Semana {g.Key} ({minDate:MMM yyyy})",
-                    FechaInicioSemana = minDate.Date,
+                    SemanaEtiqueta = $"Semana ({monday:dd MMM yyyy})",
+                    FechaInicioSemana = DateTime.SpecifyKind(monday, DateTimeKind.Utc),
                     ActividadesCompletadas = g.Count(x => x.CompletadaExitosamente),
                     TasaAciertosPorcentaje = totalSem > 0 ? Math.Round((double)aciertosSem / totalSem * 100.0, 1) : 0.0,
                     PromedioTiempoRespuestaSegundos = Math.Round(g.Average(x => x.TiempoRespuestaSegundos), 1)
@@ -176,6 +183,10 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             ? Math.Round(executions.Average(e => e.TiempoRespuestaSegundos), 1) 
             : 0.0;
 
+        double promedioFallosAula = executions.Any() 
+            ? Math.Round((double)totalFallos / executions.Count, 1) 
+            : 0.0;
+
         // Desempeño individual de cada estudiante (incluyendo los sin aula)
         var desempenoEstudiantes = new List<StudentClassPerformanceDto>();
         foreach (var student in allStudents)
@@ -185,14 +196,38 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             int stFallos = studentExecutions.Sum(x => x.CantidadIntentosFallidos);
             int stTotal = stAciertos + stFallos;
 
+            var stEvolucionSemanal = studentExecutions
+                .GroupBy(e => GetMondayOfWeek(e.FechaRegistro))
+                .Select(g =>
+                {
+                    var monday = g.Key;
+                    int aciertosSem = g.Sum(x => x.CantidadAciertos);
+                    int fallosSem = g.Sum(x => x.CantidadIntentosFallidos);
+                    int totalSem = aciertosSem + fallosSem;
+
+                    return new WeeklyEvolutionDto
+                    {
+                        SemanaEtiqueta = $"Semana ({monday:dd MMM yyyy})",
+                        FechaInicioSemana = DateTime.SpecifyKind(monday, DateTimeKind.Utc),
+                        ActividadesCompletadas = g.Count(x => x.CompletadaExitosamente),
+                        TasaAciertosPorcentaje = totalSem > 0 ? Math.Round((double)aciertosSem / totalSem * 100.0, 1) : 0.0,
+                        PromedioTiempoRespuestaSegundos = Math.Round(g.Average(x => x.TiempoRespuestaSegundos), 1)
+                    };
+                })
+                .OrderBy(w => w.FechaInicioSemana)
+                .ToList();
+
             desempenoEstudiantes.Add(new StudentClassPerformanceDto
             {
                 StudentId = student.Id,
                 NombreCompleto = student.User?.NombreCompleto ?? string.Empty,
                 CodigoEstudiante = student.CodigoEstudiante,
                 ActividadesCompletadas = studentExecutions.Count(x => x.CompletadaExitosamente),
+                TotalIntentos = studentExecutions.Count,
                 TasaAciertosPorcentaje = stTotal > 0 ? Math.Round((double)stAciertos / stTotal * 100.0, 1) : 0.0,
-                PromedioTiempoRespuestaSegundos = studentExecutions.Any() ? Math.Round(studentExecutions.Average(x => x.TiempoRespuestaSegundos), 1) : 0.0
+                PromedioTiempoRespuestaSegundos = studentExecutions.Any() ? Math.Round(studentExecutions.Average(x => x.TiempoRespuestaSegundos), 1) : 0.0,
+                IntentosFallidosPromedio = studentExecutions.Any() ? Math.Round((double)stFallos / studentExecutions.Count, 1) : 0.0,
+                EvolucionSemanal = stEvolucionSemanal
             });
         }
 
@@ -210,7 +245,8 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
                     TipoActividad = g.Key.ToString(),
                     TotalEjecuciones = g.Count(),
                     PromedioTiempoRespuestaSegundos = Math.Round(g.Average(x => x.TiempoRespuestaSegundos), 1),
-                    TasaAciertosPorcentaje = totalTipo > 0 ? Math.Round((double)aciertosTipo / totalTipo * 100.0, 1) : 0.0
+                    TasaAciertosPorcentaje = totalTipo > 0 ? Math.Round((double)aciertosTipo / totalTipo * 100.0, 1) : 0.0,
+                    PromedioIntentosFallidos = g.Any() ? Math.Round((double)fallosTipo / g.Count(), 1) : 0.0
                 };
             })
             .OrderBy(m => m.TipoActividad)
@@ -225,6 +261,8 @@ public class TeacherAnalyticsService : ITeacherAnalyticsService
             TasaAciertosPromedioAula = tasaAciertosAula,
             PromedioTiempoRespuestaAula = promedioTiempoAula,
             TotalActividadesCompletadasAula = executions.Count(e => e.CompletadaExitosamente),
+            TotalIntentosAula = executions.Count,
+            PromedioIntentosFallidosAula = promedioFallosAula,
             TiemposPorTipoActividad = metricasPorTipo,
             DesempenoEstudiantes = desempenoEstudiantes.OrderBy(d => d.NombreCompleto).ToList()
         };

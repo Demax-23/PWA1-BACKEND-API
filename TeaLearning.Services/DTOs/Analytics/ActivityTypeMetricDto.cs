@@ -6,4 +6,5 @@ public class ActivityTypeMetricDto
     public int TotalEjecuciones { get; set; }
     public double PromedioTiempoRespuestaSegundos { get; set; }
     public double TasaAciertosPorcentaje { get; set; }
+    public double PromedioIntentosFallidos { get; set; }
 }
