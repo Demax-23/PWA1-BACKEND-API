@@ -62,8 +62,8 @@ public class UserService : IUserService
                 NombreCompleto = user.NombreCompleto,
                 Roles = roles.ToList(),
                 IsActive = user.IsActive,
-                CreatedAt = user.CreatedAt,
-                UltimaActividadAt = user.UltimaActividadAt,
+                CreatedAt = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
+                UltimaActividadAt = user.UltimaActividadAt.HasValue ? DateTime.SpecifyKind(user.UltimaActividadAt.Value, DateTimeKind.Utc) : null,
                 AvatarUrl = user.AvatarUrl,
                 EstudianteId = user.StudentProfile?.Id,
                 DocenteId = user.TeacherProfile?.Id,
@@ -111,8 +111,8 @@ public class UserService : IUserService
             NombreCompleto = user.NombreCompleto,
             Roles = roles.ToList(),
             IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt,
-            UltimaActividadAt = user.UltimaActividadAt,
+            CreatedAt = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
+            UltimaActividadAt = user.UltimaActividadAt.HasValue ? DateTime.SpecifyKind(user.UltimaActividadAt.Value, DateTimeKind.Utc) : null,
             AvatarUrl = user.AvatarUrl,
             EstudianteId = user.StudentProfile?.Id,
             DocenteId = user.TeacherProfile?.Id,
@@ -161,6 +161,7 @@ public class UserService : IUserService
 
         user.RefreshToken = null;
         user.RefreshTokenExpiryTime = null;
+        user.UltimaActividadAt = DateTime.UtcNow;
         await _userManager.UpdateSecurityStampAsync(user);
 
         await EnsureRoleProfilesAsync(user, dto.Roles);
@@ -178,8 +179,8 @@ public class UserService : IUserService
             NombreCompleto = user.NombreCompleto,
             Roles = dto.Roles,
             IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt,
-            UltimaActividadAt = user.UltimaActividadAt,
+            CreatedAt = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
+            UltimaActividadAt = user.UltimaActividadAt.HasValue ? DateTime.SpecifyKind(user.UltimaActividadAt.Value, DateTimeKind.Utc) : null,
             AvatarUrl = user.AvatarUrl,
             EstudianteId = studentProfile?.Id,
             DocenteId = teacherProfile?.Id,
@@ -238,6 +239,8 @@ public class UserService : IUserService
             user.IsActive = dto.IsActive.Value;
         }
 
+        user.UltimaActividadAt = DateTime.UtcNow;
+
         var updateResult = await _userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
         {
@@ -270,6 +273,7 @@ public class UserService : IUserService
             shouldRevokeSession = true;
             user.RefreshToken = null;
             user.RefreshTokenExpiryTime = null;
+            user.UltimaActividadAt = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
         }
 
@@ -294,8 +298,8 @@ public class UserService : IUserService
             NombreCompleto = user.NombreCompleto,
             Roles = finalRoles.ToList(),
             IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt,
-            UltimaActividadAt = user.UltimaActividadAt,
+            CreatedAt = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
+            UltimaActividadAt = user.UltimaActividadAt.HasValue ? DateTime.SpecifyKind(user.UltimaActividadAt.Value, DateTimeKind.Utc) : null,
             AvatarUrl = user.AvatarUrl,
             EstudianteId = studentProfile?.Id,
             DocenteId = teacherProfile?.Id,

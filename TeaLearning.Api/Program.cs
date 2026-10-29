@@ -15,6 +15,8 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new FlexibleDecimalJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new FlexibleNullableDecimalJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new NullableUtcDateTimeJsonConverter());
     })
     .ConfigureApiBehaviorOptions(options =>
     {
