@@ -193,15 +193,6 @@ public class ActivityService : IActivityService
 
         await _activityRepository.DeleteAsync(activity, cancellationToken);
 
-        var relatedAssignments = await _context.ActivityAssignments
-            .Where(aa => aa.ActivityId == id && aa.IsActive)
-            .ToListAsync(cancellationToken);
-        foreach (var asg in relatedAssignments)
-        {
-            asg.IsActive = false;
-        }
-        await _context.SaveChangesAsync(cancellationToken);
-
         return ApiResponse<bool>.Ok(true, "Actividad pedagógica eliminada exitosamente");
     }
 
