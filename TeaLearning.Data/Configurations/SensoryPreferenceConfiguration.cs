@@ -8,7 +8,10 @@ public class SensoryPreferenceConfiguration : IEntityTypeConfiguration<SensoryPr
 {
     public void Configure(EntityTypeBuilder<SensoryPreference> builder)
     {
-        builder.ToTable("SensoryPreferences");
+        builder.ToTable("SensoryPreferences", tb =>
+        {
+            tb.HasTrigger("TR_SensoryPreferences_AfterUpsert_EnforceAndLog");
+        });
 
         builder.HasKey(sp => sp.Id);
 

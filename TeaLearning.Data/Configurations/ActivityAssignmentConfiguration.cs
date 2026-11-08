@@ -8,7 +8,11 @@ public class ActivityAssignmentConfiguration : IEntityTypeConfiguration<Activity
 {
     public void Configure(EntityTypeBuilder<ActivityAssignment> builder)
     {
-        builder.ToTable("ActivityAssignments");
+        builder.ToTable("ActivityAssignments", tb =>
+        {
+            tb.HasTrigger("TR_ActivityAssignments_AfterUpdate_GradeAndRoutine");
+            tb.HasTrigger("TR_ActivityAssignments_AfterDelete_PreserveAndReorder");
+        });
 
         builder.HasKey(aa => aa.Id);
 

@@ -147,6 +147,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGuardianMonitoringService, GuardianMonitoringService>();
         services.AddScoped<IPedagogicalNoteService, PedagogicalNoteService>();
         services.AddScoped<IAchievementService, AchievementService>();
+        services.AddScoped<IReportService, ReportService>();
 
         // 5.1 Correo transaccional y restablecimiento de contraseña
         services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));

@@ -8,7 +8,10 @@ public class ActivityExecutionConfiguration : IEntityTypeConfiguration<ActivityE
 {
     public void Configure(EntityTypeBuilder<ActivityExecution> builder)
     {
-        builder.ToTable("ActivityExecutions");
+        builder.ToTable("ActivityExecutions", tb =>
+        {
+            tb.HasTrigger("TR_ActivityExecutions_AfterInsert_SyncAndAlert");
+        });
 
         builder.HasKey(ae => ae.Id);
 

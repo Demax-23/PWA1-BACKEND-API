@@ -8,7 +8,10 @@ public class ActivityConfiguration : IEntityTypeConfiguration<Activity>
 {
     public void Configure(EntityTypeBuilder<Activity> builder)
     {
-        builder.ToTable("Activities");
+        builder.ToTable("Activities", tb =>
+        {
+            tb.HasTrigger("TR_Activities_AfterUpdate_CascadeDeactivation");
+        });
 
         builder.HasKey(a => a.Id);
 

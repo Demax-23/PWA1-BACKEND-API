@@ -528,7 +528,8 @@ public static class DatabaseSeeder
             await SeedTestStudentsAsync(context, userManager, classroom, teacherProfile, guardianProfile);
 
             // 11. Escenarios de prueba adicionales (bordes, paginación, calificaciones, notas, preferencias, cuentas especiales)
-            await TestDataSeeder.SeedAsync(context, userManager, classroom, teacherProfile);
+            await TestDataSeeder.SeedAsync(context, userManager, classroom, teacherProfile);
+            await SqlScripts.SqlProgrammabilityDefinitions.EnsureProgrammabilityObjectsAsync(context);
         }
     }
 

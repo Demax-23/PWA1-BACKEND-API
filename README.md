@@ -253,3 +253,38 @@ El semillero automático genera escenarios de prueba exhaustivos con datos deter
 * `GET /api/students/{id}/pedagogical-notes`: Consulta cronológica de notas cualitativas de la bitácora *(Rol: Docente, Administrador o Acudiente del estudiante)*.
 * `PUT /api/log-entries/{id}`: Edición de notas cualitativas *(Rol: Docente o Administrador)*.
 * `DELETE /api/log-entries/{id}`: Eliminación lógica de notas cualitativas *(Rol: Docente o Administrador)*.
+
+
+---
+
+## 🗄️ Programabilidad SQL Server: 5 Triggers y 5 Stored Procedures Complejos
+
+Las definiciones T-SQL se encuentran en `TeaLearning.Data/SqlScripts/SqlProgrammabilityDefinitions.cs` y en el script consolidado `TeaLearning.Data/SqlScripts/Triggers_And_StoredProcedures.sql`, aprovisionándose automáticamente mediante la migración EF Core `AddBusinessTriggersAndStoredProcedures` y en `DatabaseSeeder.SeedAsync`.
+
+### 5 Triggers de Negocio (`INSERT`, `UPDATE`, `DELETE`)
+1. **`TR_ActivityExecutions_AfterInsert_SyncAndAlert`** (`AFTER INSERT` en `ActivityExecutions`):
+   - Sincroniza automáticamente `ActivityAssignments.Estado` (`Completada` / `EnProgreso`), actualiza `AspNetUsers.UltimaActividadAt` y genera una alerta clínica en `PedagogicalNotes` cuando detecta frustración o sobrecarga (`CantidadIntentosFallidos >= 4` o `TiempoRespuestaSegundos >= 180` sin éxito).
+2. **`TR_ActivityAssignments_AfterUpdate_GradeAndRoutine`** (`AFTER UPDATE` en `ActivityAssignments`):
+   - Al calificar una actividad, asegura `Estado = 'Completada'`, crea automáticamente una nota pedagógica de retroalimentación (`Logro` / `Observacion` / `Alerta`), programa una asignación de refuerzo (`Prioridad = 'Alta'`) cuando `Calificacion < 3.0` y promueve la prioridad del siguiente paso de la rutina diaria.
+3. **`TR_SensoryPreferences_AfterUpsert_EnforceAndLog`** (`AFTER INSERT, UPDATE` en `SensoryPreferences`):
+   - Impone las invariantes de seguridad sensorial TEA Nivel 1 (acotación de `VolumenAudio`, `NivelEscalaFuente`, `SegundosAvisoPrevio` y coherencia de `ModoTemporizador = 'sin-temporizador'`) y registra trazabilidad automática en `PedagogicalNotes` (`Area = 'Sensorial'`).
+4. **`TR_Activities_AfterUpdate_CascadeDeactivation`** (`AFTER UPDATE` en `Activities`):
+   - Cuando una actividad pasa a `IsActive = 0`, desactiva las asignaciones aún no completadas (`Pendiente` / `EnProgreso`), recompacta `OrdenSecuencial` (`1, 2, 3...`) sin espacios vacíos y registra una nota de anticipación de cambio de rutina.
+5. **`TR_ActivityAssignments_AfterDelete_PreserveAndReorder`** (`AFTER DELETE` en `ActivityAssignments`):
+   - Preserva las notas pedagógicas asociadas (`AssignmentId = NULL` + marca histórica `[Ref: Asignación eliminada]`) y reordena automáticamente `OrdenSecuencial` de la agenda diaria del estudiante.
+
+### 5 Stored Procedures Complejos (Variables, Tablas Temporales, Ciclos `WHILE` y Transacciones)
+1. **`sp_GenerarReporteIntegralEstudiante`**: Construye el reporte individual con serie diaria continua (`#SerieDiaria`, media móvil de 7 días y cálculo de rachas en ciclo `WHILE`), desglose por tipo de actividad TEA (`#DesgloseTipoActividad`), avance de módulos (`#ProgresoModulos`), Índice de Progreso Pedagógico (IPP) y síntesis diagnóstica.
+2. **`sp_GenerarReporteConsolidadoAula`**: Construye el reporte analítico consolidado del aula evaluando iterativamente el semáforo de riesgo por estudiante (`#EstudiantesAula`), la efectividad por módulo (`#EfectividadModulosAula`) y la evolución de las últimas 4 semanas (`#SerieSemanalAula`).
+3. **`sp_AsignarRutinaAdaptativaPorAula`**: Motor transaccional (`TRY...CATCH`) con doble ciclo `WHILE` que analiza la tasa de error reciente de cada estudiante del aula y programa automáticamente actividades de refuerzo o progresión calibradas según su perfil sensorial.
+4. **`sp_EvaluarAlertasYRecomendacionesTEA`**: Recorre los estudiantes activos mediante un ciclo `WHILE`, evalúa 4 heurísticas clínicas TEA (frustración repetitiva, latencia elevada, pausa en rutina y logro sostenido) e inserta recomendaciones idempotentes en `PedagogicalNotes`.
+5. **`sp_RecalcularProgresoYLogrosEstudiante`**: Reconcilia estados de `ActivityAssignments`, audita el porcentaje de avance de cada módulo temático (`#ModulosAudit`) registrando hitos de conclusión y evalúa las 7 insignias no competitivas (`#InsigniasEvaluadas`).
+
+### Endpoints de Reportes y Procedimientos Almacenados (`ReportsController` / `AssignmentsController`)
+* `GET /api/reports/student/{studentId}?diasVentana=30`: Reporte integral individual para PDF *(Roles: Docente, Acudiente, Administrador)*.
+* `GET /api/reports/student?diasVentana=30`: Reporte integral del estudiante vinculado al usuario actual *(Roles: Docente, Acudiente, Administrador)*.
+* `GET /api/reports/classroom/{classroomId}?diasVentana=30`: Reporte consolidado del aula *(Roles: Docente, Administrador)*.
+* `GET /api/reports/classroom?diasVentana=30`: Reporte consolidado del aula titular del docente autenticado *(Roles: Docente, Administrador)*.
+* `POST /api/reports/alerts/evaluate`: Ejecuta `sp_EvaluarAlertasYRecomendacionesTEA` *(Roles: Docente, Administrador)*.
+* `POST /api/reports/student/{studentId}/recalculate-progress`: Ejecuta `sp_RecalcularProgresoYLogrosEstudiante` *(Roles: Docente, Acudiente, Administrador)*.
+* `POST /api/assignments/adaptive`: Ejecuta `sp_AsignarRutinaAdaptativaPorAula` *(Roles: Docente, Administrador)*.

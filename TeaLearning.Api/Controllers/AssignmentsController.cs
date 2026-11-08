@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using TeaLearning.Core.Enums;
 using TeaLearning.Services.Common;
 using TeaLearning.Services.DTOs.Assignments;
+using TeaLearning.Services.DTOs.Reports;
 using TeaLearning.Services.Interfaces;
 
 namespace TeaLearning.Api.Controllers;
@@ -11,10 +12,42 @@ namespace TeaLearning.Api.Controllers;
 public class AssignmentsController : BaseApiController
 {
     private readonly IAssignmentService _assignmentService;
+    private readonly IReportService _reportService;
 
-    public AssignmentsController(IAssignmentService assignmentService)
+    public AssignmentsController(IAssignmentService assignmentService, IReportService reportService)
     {
         _assignmentService = assignmentService;
+        _reportService = reportService;
+    }
+
+    /// <summary>
+    /// Programa automáticamente una rutina adaptativa por aula ejecutando sp_AsignarRutinaAdaptativaPorAula.
+    /// </summary>
+    [HttpPost("adaptive")]
+    [Authorize(Roles = "Docente,Administrador")]
+    [ProducesResponseType(typeof(ApiResponse<List<AdaptiveRoutineAssignmentResultDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<AdaptiveRoutineAssignmentResultDto>>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateAdaptiveRoutine(
+        [FromBody] AdaptiveRoutineRequestDto? request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponse<List<AdaptiveRoutineAssignmentResultDto>>.Fail("No se pudo identificar al usuario autenticado."));
+        }
+
+        var result = await _reportService.AssignAdaptiveRoutineByClassroomAsync(
+            userId.Value,
+            request ?? new AdaptiveRoutineRequestDto(),
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
     }
 
     /// <summary>
