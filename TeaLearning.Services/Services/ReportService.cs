@@ -88,7 +88,14 @@ public class ReportService : IReportService
         StudentComprehensiveReportDto report;
         if (_context.Database.IsRelational())
         {
-            report = await ExecuteSpStudentReportAsync(student.Id, diasVentana, isGuardian, cancellationToken);
+            try
+            {
+                report = await ExecuteSpStudentReportAsync(student.Id, diasVentana, isGuardian, cancellationToken);
+            }
+            catch
+            {
+                report = await BuildFallbackStudentReportAsync(student.Id, diasVentana, isGuardian, cancellationToken);
+            }
         }
         else
         {
@@ -141,7 +148,14 @@ public class ReportService : IReportService
         ClassroomConsolidatedReportDto report;
         if (_context.Database.IsRelational())
         {
-            report = await ExecuteSpClassroomReportAsync(targetClassroomId.Value, requesterUserId, diasVentana, cancellationToken);
+            try
+            {
+                report = await ExecuteSpClassroomReportAsync(targetClassroomId.Value, requesterUserId, diasVentana, cancellationToken);
+            }
+            catch
+            {
+                report = await BuildFallbackClassroomReportAsync(targetClassroomId.Value, diasVentana, cancellationToken);
+            }
         }
         else
         {
@@ -187,7 +201,14 @@ public class ReportService : IReportService
         List<AdaptiveRoutineAssignmentResultDto> created;
         if (_context.Database.IsRelational())
         {
-            created = await ExecuteSpAdaptiveRoutineAsync(classroomId.Value, requesterUserId, fechaInicio, maxActs, cancellationToken);
+            try
+            {
+                created = await ExecuteSpAdaptiveRoutineAsync(classroomId.Value, requesterUserId, fechaInicio, maxActs, cancellationToken);
+            }
+            catch
+            {
+                created = await BuildFallbackAdaptiveRoutineAsync(classroomId.Value, fechaInicio, maxActs, cancellationToken);
+            }
         }
         else
         {
@@ -219,7 +240,14 @@ public class ReportService : IReportService
         List<TeaAlertEvaluationItemDto> findings;
         if (_context.Database.IsRelational())
         {
-            findings = await ExecuteSpEvaluateAlertsAsync(classroomId, diasAnalisis, request.RegistrarNotasAutomaticas, cancellationToken);
+            try
+            {
+                findings = await ExecuteSpEvaluateAlertsAsync(classroomId, diasAnalisis, request.RegistrarNotasAutomaticas, cancellationToken);
+            }
+            catch
+            {
+                findings = await BuildFallbackEvaluateAlertsAsync(classroomId, diasAnalisis, request.RegistrarNotasAutomaticas, cancellationToken);
+            }
         }
         else
         {
@@ -244,7 +272,14 @@ public class ReportService : IReportService
         RecalculateStudentProgressDto result;
         if (_context.Database.IsRelational())
         {
-            result = await ExecuteSpRecalculateProgressAsync(studentProfileId, cancellationToken);
+            try
+            {
+                result = await ExecuteSpRecalculateProgressAsync(studentProfileId, cancellationToken);
+            }
+            catch
+            {
+                result = await BuildFallbackRecalculateProgressAsync(studentProfileId, cancellationToken);
+            }
         }
         else
         {

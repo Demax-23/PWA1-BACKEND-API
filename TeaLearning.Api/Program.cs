@@ -116,6 +116,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
 
             logger.LogInformation("Aplicando migraciones pendientes en SQL Server / Azure SQL en segundo plano...");
             await dbContext.Database.MigrateAsync();
+            await TeaLearning.Data.SqlScripts.SqlProgrammabilityDefinitions.EnsureProgrammabilityObjectsAsync(dbContext);
 
             if (seedOnStartup)
             {
