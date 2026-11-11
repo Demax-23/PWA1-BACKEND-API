@@ -102,7 +102,7 @@ app.Use(async (context, next) =>
 app.MapControllers();
 
 // Auto-Migración Segura y Semillero Idempotente en segundo plano tras iniciar Kestrel
-// Garantiza que app.Run() abra el puerto HTTP de inmediato para el Health Check de Azure App Service
+// Garantiza que app.RunAsync() abra el puerto HTTP de inmediato para el Health Check de Azure App Service
 var seedOnStartup = builder.Configuration.GetValue<bool>("SeedDatabaseOnStartup", true);
 app.Lifetime.ApplicationStarted.Register(() =>
 {
@@ -139,4 +139,4 @@ app.Lifetime.ApplicationStarted.Register(() =>
     });
 });
 
-app.Run();
+await app.RunAsync();

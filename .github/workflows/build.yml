@@ -46,6 +46,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"Demax-23_PWA1-BACKEND-API" /o:"demax-23" /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-          dotnet build TeaLearningSystem.slnx
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"Demax-23_PWA1-BACKEND-API" /o:"demax-23" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml"
+          dotnet build TeaLearningSystem.slnx --no-incremental
+          dotnet test TeaLearningSystem.slnx --no-build --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

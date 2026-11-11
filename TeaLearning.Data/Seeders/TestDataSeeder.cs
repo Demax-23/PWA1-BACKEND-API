@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
@@ -13,8 +14,6 @@ namespace TeaLearning.Data.Seeders;
 /// preferencias sensoriales y cuentas en estados especiales) para validar la plataforma de punta a punta.
 ///
 /// Reglas de diseño:
-/// - Determinista: cada escenario usa su propio <see cref="Random"/> con semilla fija (2026 + clave estable),
-///   de modo que saltarse un escenario ya sembrado no altera los valores de los demás.
 /// - Idempotente: cada escenario consulta por email / título / (estudiante, actividad) antes de crear.
 ///   Cada paquete de asignación + calificación + ejecuciones se guarda en un único SaveChanges (atómico).
 /// - Aditivo: no borra nada. Única modificación de datos existentes: corregir el ConfigJson vacío de
@@ -22,7 +21,6 @@ namespace TeaLearning.Data.Seeders;
 /// </summary>
 public static class TestDataSeeder
 {
-    private const int BaseSeed = 2026;
     private const string QaPrefix = "[QA] ";
 
     // Cuentas no-estudiante: alias de Gmail (mismo esquema que las cuentas base).
@@ -441,7 +439,6 @@ public static class TestDataSeeder
         var s45 = await FindStudentAsync(context, "EST-TEA-007");
         if (s45 != null)
         {
-            var rnd = Rng("EST-TEA-007");
             var plan = new (Activity act, int n, bool complete, int latest, decimal? grade, string? comment)[]
             {
                 (c.Cepillado, 8, true, 0, 5.0m, "Excelente: completó la secuencia sin ayuda."),
@@ -465,7 +462,7 @@ public static class TestDataSeeder
                     Prioridad = PrioridadActividad.Media,
                     Calificacion = p.grade,
                     Comentario = p.comment,
-                    Execs = BuildExecs(rnd, p.n, p.complete, p.latest)
+                    Execs = BuildExecs(p.n, p.complete, p.latest)
                 });
             }
             await SaveIfPendingAsync(context);
@@ -551,7 +548,6 @@ public static class TestDataSeeder
         foreach (var code in gradedStudents)
         {
             var student = await FindStudentAsync(context, code);
-            var rnd = Rng("grades-" + code);
             for (int k = 0; k < 2; k++, g++)
             {
                 if (student == null) continue;
@@ -565,7 +561,7 @@ public static class TestDataSeeder
                     Prioridad = (PrioridadActividad)(g % 3),
                     Calificacion = grade,
                     Comentario = comment,
-                    Execs = BuildExecs(rnd, rnd.Next(1, 4), true, rnd.Next(1, 20))
+                    Execs = BuildExecs(RandomNumberGenerator.GetInt32(1, 4), true, RandomNumberGenerator.GetInt32(1, 20))
                 });
             }
             await SaveIfPendingAsync(context);
@@ -578,8 +574,8 @@ public static class TestDataSeeder
             .ToListAsync();
         foreach (var student in classroomStudents)
         {
-            var rnd = Rng("batch-" + student.CodigoEstudiante);
-            bool didIt = rnd.Next(2) == 0;
+            // El estudiante del escenario sin ejecuciones recibe la asignación grupal como pendiente.
+            bool didIt = student.Id != sNone?.Id && RandomNumberGenerator.GetInt32(2) == 0;
             AddAssignment(context, teacher, student, new AssignmentSpec
             {
                 Activity = c.SaludoGrupal,
@@ -588,8 +584,16 @@ public static class TestDataSeeder
                 Orden = 5,
                 Prioridad = PrioridadActividad.Media,
                 Execs = didIt
-                    ? new List<ExecSpec> { new(rnd.Next(0, 6), rnd.Next(20, 90), rnd.Next(3, 7), rnd.Next(0, 3), true) }
-                    : new List<ExecSpec>()
+                    ?
+                    [
+                        new ExecSpec(
+                            RandomNumberGenerator.GetInt32(0, 6),
+                            RandomNumberGenerator.GetInt32(20, 90),
+                            RandomNumberGenerator.GetInt32(3, 7),
+                            RandomNumberGenerator.GetInt32(0, 3),
+                            true)
+                    ]
+                    : []
             });
             await SaveIfPendingAsync(context);
         }
@@ -609,7 +613,6 @@ public static class TestDataSeeder
             .Any(a => a.StudentProfileId == student.Id && a.ActivityId == spec.Activity.Id);
         if (exists) return;
 
-        var rnd = Rng($"dates-{student.CodigoEstudiante}-{spec.Activity.Titulo}");
         var assignment = new ActivityAssignment
         {
             ActivityId = spec.Activity.Id,
@@ -628,7 +631,7 @@ public static class TestDataSeeder
         DateTime lastExec = DateTime.MinValue;
         foreach (var e in spec.Execs)
         {
-            var when = ExecDate(rnd, e.DaysAgo);
+            var when = ExecDate(e.DaysAgo);
             if (when > lastExec) lastExec = when;
 
             context.ActivityExecutions.Add(new ActivityExecution
@@ -666,10 +669,10 @@ public static class TestDataSeeder
     /// Si <paramref name="endsInSuccess"/>, la última (más reciente, a <paramref name="latestDaysAgo"/> días)
     /// es exitosa con al menos 1 acierto (regla del backend); las anteriores son intentos fallidos.
     /// </summary>
-    private static List<ExecSpec> BuildExecs(Random rnd, int n, bool endsInSuccess, int latestDaysAgo)
+    private static List<ExecSpec> BuildExecs(int n, bool endsInSuccess, int latestDaysAgo)
     {
         var days = Enumerable.Range(0, n)
-            .Select(_ => rnd.Next(latestDaysAgo, 56))
+            .Select(_ => RandomNumberGenerator.GetInt32(latestDaysAgo, 56))
             .OrderByDescending(d => d)
             .ToList();
         days[n - 1] = latestDaysAgo;
@@ -680,18 +683,20 @@ public static class TestDataSeeder
             bool ok = endsInSuccess && i == n - 1;
             list.Add(new ExecSpec(
                 days[i],
-                rnd.Next(20, 150),
-                ok ? rnd.Next(3, 11) : rnd.Next(0, 4),
-                ok ? rnd.Next(0, 3) : rnd.Next(2, 9),
+                RandomNumberGenerator.GetInt32(20, 150),
+                ok ? RandomNumberGenerator.GetInt32(3, 11) : RandomNumberGenerator.GetInt32(0, 4),
+                ok ? RandomNumberGenerator.GetInt32(0, 3) : RandomNumberGenerator.GetInt32(2, 9),
                 ok));
         }
         return list;
     }
 
-    private static DateTime ExecDate(Random rnd, int daysAgo)
+    private static DateTime ExecDate(int daysAgo)
     {
-        var date = DateTime.UtcNow.Date.AddDays(-daysAgo).AddHours(rnd.Next(13, 22)).AddMinutes(rnd.Next(0, 60));
-        return date > DateTime.UtcNow ? DateTime.UtcNow.AddMinutes(-rnd.Next(5, 90)) : date;
+        var date = DateTime.UtcNow.Date.AddDays(-daysAgo)
+            .AddHours(RandomNumberGenerator.GetInt32(13, 22))
+            .AddMinutes(RandomNumberGenerator.GetInt32(0, 60));
+        return date > DateTime.UtcNow ? DateTime.UtcNow.AddMinutes(-RandomNumberGenerator.GetInt32(5, 90)) : date;
     }
 
     // ------------------------------------------------------------------
@@ -828,20 +833,6 @@ public static class TestDataSeeder
     // ------------------------------------------------------------------
     private static Task<StudentProfile?> FindStudentAsync(ApplicationDbContext context, string codigo)
         => context.StudentProfiles.FirstOrDefaultAsync(s => s.CodigoEstudiante == codigo);
-
-    /// <summary>Random determinista por clave (hash FNV-1a estable; string.GetHashCode no lo es entre procesos).</summary>
-    private static Random Rng(string key)
-    {
-        unchecked
-        {
-            uint hash = 2166136261;
-            foreach (var ch in key)
-            {
-                hash = (hash ^ ch) * 16777619;
-            }
-            return new Random(BaseSeed ^ (int)hash);
-        }
-    }
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
 }

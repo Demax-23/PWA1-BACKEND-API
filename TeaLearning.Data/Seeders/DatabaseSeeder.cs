@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -542,7 +543,6 @@ public static class DatabaseSeeder
     {
         const int total = 10;
         const int firstNumber = 3; // estudiante@ y estudiante2@ ya existen: se continúa con estudiante3@ ... estudiante12@
-        var rnd = new Random(2026);
 
         string[] nombres = ["Sofía", "Santiago", "Valentina", "Juan", "Isabella", "Samuel", "Camila", "Emmanuel", "Luciana", "Tomás", "Mariana", "Nicolás"];
         string[] apellidos = ["Rodríguez", "Martínez", "López", "García", "Hernández", "Ramírez", "Torres", "Vargas", "Castro", "Moreno", "Rojas", "Díaz"];
@@ -597,14 +597,16 @@ public static class DatabaseSeeder
             var email = $"estudiante{number}@tealearning.com";
             var codigo = $"EST-TEA-{number:000}";
 
-            // Siempre se consumen los mismos valores aleatorios por iteración para mantener el resultado reproducible
-            var nombre = nombres[rnd.Next(nombres.Length)];
-            var apellido = $"{apellidos[rnd.Next(apellidos.Length)]} {apellidos[rnd.Next(apellidos.Length)]}";
-            var nacimiento = new DateTime(rnd.Next(2015, 2019), rnd.Next(1, 13), rnd.Next(1, 28));
-            var execCount = rnd.Next(2, 7);
-            var assignCount = rnd.Next(3, 5);
-
             if (await userManager.FindByEmailAsync(email) != null || await context.StudentProfiles.AnyAsync(s => s.CodigoEstudiante == codigo)) continue;
+
+            var nombre = nombres[RandomNumberGenerator.GetInt32(nombres.Length)];
+            var apellido = $"{apellidos[RandomNumberGenerator.GetInt32(apellidos.Length)]} {apellidos[RandomNumberGenerator.GetInt32(apellidos.Length)]}";
+            var nacimiento = new DateTime(
+                RandomNumberGenerator.GetInt32(2015, 2019),
+                RandomNumberGenerator.GetInt32(1, 13),
+                RandomNumberGenerator.GetInt32(1, 28));
+            var execCount = RandomNumberGenerator.GetInt32(2, 7);
+            var assignCount = RandomNumberGenerator.GetInt32(3, 5);
 
             var user = new ApplicationUser
             {
@@ -659,7 +661,7 @@ public static class DatabaseSeeder
                     FechaInicio = DateTime.UtcNow.Date.AddDays(-28),
                     FechaLimite = DateTime.UtcNow.Date.AddDays(7),
                     OrdenSecuencial = a + 1,
-                    Prioridad = (PrioridadActividad)rnd.Next(0, Enum.GetValues<PrioridadActividad>().Length),
+                    Prioridad = (PrioridadActividad)RandomNumberGenerator.GetInt32(0, Enum.GetValues<PrioridadActividad>().Length),
                     Estado = EstadoAsignacion.Pendiente
                 });
             }
@@ -675,19 +677,36 @@ public static class DatabaseSeeder
                 var assignment = assignments[e % assignments.Count];
                 int aciertos, fallos;
                 bool completada;
-                if (i == 1) { aciertos = rnd.Next(5, 11); fallos = 0; completada = true; }
-                else if (i == 2) { aciertos = rnd.Next(1, 3); fallos = rnd.Next(5, 9); completada = rnd.Next(0, 4) == 0; }
-                else { aciertos = rnd.Next(2, 11); fallos = rnd.Next(0, 7); completada = rnd.Next(0, 10) < 7; }
+                if (i == 1)
+                {
+                    aciertos = RandomNumberGenerator.GetInt32(5, 11);
+                    fallos = 0;
+                    completada = true;
+                }
+                else if (i == 2)
+                {
+                    aciertos = RandomNumberGenerator.GetInt32(1, 3);
+                    fallos = RandomNumberGenerator.GetInt32(5, 9);
+                    completada = RandomNumberGenerator.GetInt32(0, 4) == 0;
+                }
+                else
+                {
+                    aciertos = RandomNumberGenerator.GetInt32(2, 11);
+                    fallos = RandomNumberGenerator.GetInt32(0, 7);
+                    completada = RandomNumberGenerator.GetInt32(0, 10) < 7;
+                }
 
                 executions.Add(new ActivityExecution
                 {
                     AssignmentId = assignment.Id,
                     StudentProfileId = profile.Id,
-                    TiempoRespuestaSegundos = rnd.Next(15, 121),
+                    TiempoRespuestaSegundos = RandomNumberGenerator.GetInt32(15, 121),
                     CantidadAciertos = aciertos,
                     CantidadIntentosFallidos = fallos,
                     CompletadaExitosamente = completada,
-                    FechaRegistro = DateTime.UtcNow.AddDays(-rnd.Next(0, 28)).AddMinutes(-rnd.Next(0, 600))
+                    FechaRegistro = DateTime.UtcNow
+                        .AddDays(-RandomNumberGenerator.GetInt32(0, 28))
+                        .AddMinutes(-RandomNumberGenerator.GetInt32(0, 600))
                 });
                 if (completada) assignment.Estado = EstadoAsignacion.Completada;
                 else if (assignment.Estado == EstadoAsignacion.Pendiente) assignment.Estado = EstadoAsignacion.EnProgreso;

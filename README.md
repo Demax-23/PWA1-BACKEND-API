@@ -124,7 +124,16 @@ cd PWA1-BACKEND-API
 dotnet restore
 ```
 
-### 2. Configurar Secreto SMTP (Contraseña de Aplicación de Gmail)
+### 2. Configurar los secretos locales
+
+La API requiere una clave JWT de al menos 32 bytes. Guárdala en .NET User Secrets para el entorno local.
+
+```bash
+dotnet user-secrets set "Jwt:Key" "TU_CLAVE_JWT_ALEATORIA" --project TeaLearning.Api
+```
+
+En Azure App Service, configura `Jwt__Key` o la variable existente `TEA_JWT_SECRET_KEY` antes de desplegar.
+
 La cuenta emisora `tealearning.notificaciones@gmail.com` está configurada en `appsettings.json`, pero la contraseña de aplicación de 16 caracteres **no se almacena en el repositorio**. Configúrala localmente con `.NET User Secrets`:
 ```bash
 dotnet user-secrets set "Email:Password" "TU_CLAVE_DE_16_CARACTERES" --project TeaLearning.Api

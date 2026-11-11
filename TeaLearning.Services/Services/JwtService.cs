@@ -1,11 +1,11 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TeaLearning.Core.Entities;
 using TeaLearning.Services.Interfaces;
+using TeaLearning.Services.Security;
 
 namespace TeaLearning.Services.Services;
 
@@ -26,21 +26,11 @@ public class JwtService : IJwtService
         Guid? acudienteId = null)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
-        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
-        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
-            ? jwtSettings["Key"]
-            : jwtSettings["SecretKey"];
-        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
-            ? envSecretKey
-            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
-                ? configuredJwtKey
-                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
         var durationMinutes = int.TryParse(jwtSettings["DurationInMinutes"], out var minutes) ? minutes : 60;
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var credentials = new SigningCredentials(JwtSigningKey.Create(jwtSettings), SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
         {
@@ -106,15 +96,6 @@ public class JwtService : IJwtService
         }
 
         var jwtSettings = _configuration.GetSection("Jwt");
-        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
-        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
-            ? jwtSettings["Key"]
-            : jwtSettings["SecretKey"];
-        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
-            ? envSecretKey
-            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
-                ? configuredJwtKey
-                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
@@ -125,7 +106,7 @@ public class JwtService : IJwtService
             ValidateIssuer = true,
             ValidIssuer = issuer,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            IssuerSigningKey = JwtSigningKey.Create(jwtSettings),
             ValidateLifetime = false // Permitir tokens expirados para verificar firma
         };
 

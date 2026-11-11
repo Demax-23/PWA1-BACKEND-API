@@ -1,4 +1,3 @@
-using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -83,15 +82,7 @@ public static class ServiceCollectionExtensions
 
         // 3. Configuración de Autenticación JWT (soporta TEA_JWT_SECRET_KEY, Jwt:Key y Jwt:SecretKey)
         var jwtSettings = configuration.GetSection("Jwt");
-        var envSecretKey = Environment.GetEnvironmentVariable("TEA_JWT_SECRET_KEY");
-        var configuredJwtKey = !string.IsNullOrWhiteSpace(jwtSettings["Key"])
-            ? jwtSettings["Key"]
-            : jwtSettings["SecretKey"];
-        var secretKey = !string.IsNullOrWhiteSpace(envSecretKey)
-            ? envSecretKey
-            : (!string.IsNullOrWhiteSpace(configuredJwtKey)
-                ? configuredJwtKey
-                : "TeaLearningUltraSecretKeyTEA2026SecureJwtToken_ChangeInProd!");
+        var signingKey = JwtSigningKey.Create(jwtSettings);
         var issuer = jwtSettings["Issuer"] ?? "TeaLearningApi";
         var audience = jwtSettings["Audience"] ?? "TeaLearningClients";
 
@@ -113,7 +104,7 @@ public static class ServiceCollectionExtensions
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = issuer,
                 ValidAudience = audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                IssuerSigningKey = signingKey,
                 ClockSkew = TimeSpan.Zero
             };
         });

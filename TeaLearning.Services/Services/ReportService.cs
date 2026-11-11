@@ -122,7 +122,6 @@ public class ReportService : IReportService
         if (!targetClassroomId.HasValue || targetClassroomId.Value == Guid.Empty)
         {
             targetClassroomId = await _context.Classrooms
-                .Include(c => c.TeacherProfile)
                 .Where(c => c.IsActive && c.TeacherProfile != null && c.TeacherProfile.UserId == requesterUserId)
                 .Select(c => (Guid?)c.Id)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -181,7 +180,6 @@ public class ReportService : IReportService
         if (!classroomId.HasValue || classroomId.Value == Guid.Empty)
         {
             classroomId = await _context.Classrooms
-                .Include(c => c.TeacherProfile)
                 .Where(c => c.IsActive && c.TeacherProfile != null && c.TeacherProfile.UserId == requesterUserId)
                 .Select(c => (Guid?)c.Id)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -231,7 +229,6 @@ public class ReportService : IReportService
         if (!classroomId.HasValue || classroomId.Value == Guid.Empty)
         {
             classroomId = await _context.Classrooms
-                .Include(c => c.TeacherProfile)
                 .Where(c => c.IsActive && c.TeacherProfile != null && c.TeacherProfile.UserId == requesterUserId)
                 .Select(c => (Guid?)c.Id)
                 .FirstOrDefaultAsync(cancellationToken);
